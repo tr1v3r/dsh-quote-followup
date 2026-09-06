@@ -28,6 +28,13 @@
     "README.md",
     "README.zh.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tr1v3r/dsh-quote-followup.git"
+  },
+  "homepage": "https://github.com/tr1v3r/dsh-quote-followup#readme",
+  "bugs": "https://github.com/tr1v3r/dsh-quote-followup/issues",
+  "author": "tr1v3r <tr1v3r@outlook.com> (https://github.com/tr1v3r)",
   "license": "MIT",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
