@@ -1,0 +1,8 @@
+# dsh-quote-followup bundle patch: one row over whatever layers came before.
+# Zero config by design — the quoting flow needs no machine-local values.
+# A profile may still override the row (config: {shortcut, pickerLimit,
+# quoteMaxChars}) by restating the whole config block, per patch semantics.
+
+- insert:
+    - id: quote-followup
+      name: dsh-quote-followup
