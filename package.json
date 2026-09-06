@@ -1,6 +1,6 @@
 {
   "name": "dsh-quote-followup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Quote selected conversation content into a targeted follow-up turn for DeepSeek Harness — a TUI face (message picker + next-input rewrite via the official plugin seams) and a Web face (text-selection quoting into the composer).",
   "keywords": [
     "dsh",
