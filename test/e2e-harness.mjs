@@ -58,9 +58,11 @@ const backup = existsSync(SERVERS_FILE) ? readFileSync(SERVERS_FILE, 'utf8') : n
 writeFileSync(SERVERS_FILE, JSON.stringify([{ pid: process.pid, sessionId: 'harness', cwd: dir, socketPath: sockPath, startedAt: Date.now() }]));
 
 try {
+    const clipboardFixture = join(dir, 'clip.txt');
+    writeFileSync(clipboardFixture, '这是刚划选的终端文本');
     const root = new Context({});
     await root.plugin(extensionsModule.default ?? extensionsModule);
-    root.plugin({ name: 'dsh-quote-followup', apply: ctx => plugin.apply(ctx, {}) });
+    root.plugin({ name: 'dsh-quote-followup', apply: ctx => plugin.apply(ctx, { clipboardReadCommand: `cat ${clipboardFixture}` }) });
     await new Promise(resolve => setTimeout(resolve, 3400)); // service-wait budget
 
     const shortcuts = root.get('tuiShortcuts');
@@ -68,9 +70,10 @@ try {
     check('services mounted', shortcuts !== undefined && dialogs !== undefined);
 
     let lastOptions = [];
+    let pickId = null;
     dialogs.select = async request => {
         lastOptions = request.options;
-        return request.options.find(option => option.id === '5')?.id;
+        return pickId === null ? undefined : request.options.find(option => option.id === pickId)?.id;
     };
 
     // firehose: two messages in session s1, one in s2 (must not leak)
@@ -79,13 +82,26 @@ try {
     root.emit('session/event', { id: 's2' }, { type: 'user/message', seq: 1, data: { content: [{ type: 'text', text: '另一个会话' }] } });
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    // s2 has the LATEST user message → picker targets s2 (documented semantics)
+    // s2 has the LATEST user message → picker targets s2 (documented semantics).
+    // The clipboard row (copy-on-select bridge) always leads the list.
+    pickId = '__clipboard__';
     const matched = getHostShortcuts(shortcuts).dispatch('q', { ctrl: true, meta: true, shift: false, super: false });
     check('shortcut dispatched', matched === true);
     await new Promise(resolve => setTimeout(resolve, 400));
-    check('dialog opened (latest-user session)', lastOptions.length === 1 && lastOptions[0].id === '1', lastOptions.map(o => o.label).join(' | '));
+    check('clipboard row leads the picker', lastOptions[0]?.id === '__clipboard__' && lastOptions.length === 2
+        && lastOptions[1].id === '1', lastOptions.map(o => o.label).join(' | '));
+    let payload = received.join('');
+    let injectLine = null;
+    try {
+        injectLine = JSON.parse(payload.trim().split('\n').pop());
+    }
+    catch { /* assertion below */ }
+    check('clipboard quote injected', injectLine !== null && injectLine.type === 'prompt.append'
+        && injectLine.text.includes('[引用 1/1 · 划选]') && injectLine.text.includes('这是刚划选的终端文本'),
+        payload.slice(0, 160));
 
     // now make s1 current (latest user message) and pick the assistant answer
+    pickId = '5';
     root.emit('session/event', { id: 's1' }, { type: 'user/message', seq: 8, data: { content: [{ type: 'text', text: '再问一句' }] } });
     await new Promise(resolve => setTimeout(resolve, 100));
     getHostShortcuts(shortcuts).dispatch('q', { ctrl: true, meta: true, shift: false, super: false });
@@ -93,8 +109,8 @@ try {
 
     check('picker listed s1 messages', lastOptions.some(o => o.id === '8') && lastOptions.some(o => o.id === '5'),
         lastOptions.map(o => o.label).join(' | '));
-    const payload = received.join('');
-    let injectLine = null;
+    payload = received.join('');
+    injectLine = null;
     try {
         injectLine = JSON.parse(payload.trim().split('\n').pop());
     }

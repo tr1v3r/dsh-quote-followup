@@ -4,10 +4,10 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 
-/** One quoted message. */
+/** One quoted message (`seq: null` marks a mouse-selection/clipboard quote). */
 export interface QuoteEntry {
-    seq: number;
-    role: 'user' | 'assistant';
+    seq: number | null;
+    role: 'user' | 'assistant' | '划选';
     text: string;
 }
 
@@ -19,6 +19,9 @@ export interface QuoteFollowupConfig {
     pickerLimit?: number;
     /** Per-quote character cap. Default 1600. */
     quoteMaxChars?: number;
+    /** Custom clipboard reader (`/bin/sh -c`; defaults to pbpaste / wl-paste /
+     *  xclip / xsel probing). */
+    clipboardReadCommand?: string;
 }
 
 /** Clip a string to `max` cells with an ellipsis marker. */
@@ -33,6 +36,9 @@ export declare function extractMessage(session: { id: string } | null, event: {
 
 /** Compose the quote block appended into the prompt input. */
 export declare function frameQuotes(quotes: QuoteEntry[], quoteMaxChars?: number): string;
+
+/** Read the system clipboard ('' on failure / unsupported platform). */
+export declare function readClipboard(overrideCommand?: string): Promise<string>;
 
 export declare const name: string;
 export declare const inject: string[];

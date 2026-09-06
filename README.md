@@ -48,11 +48,22 @@ Add `dsh-quote-followup` to `dsh.profile.bundles` and restart. No grants file
 
 ### TUI
 
-1. Converse normally (messages enter the buffer).
-2. `Ctrl+Alt+Q` → picker lists recent messages (`#seq me/assistant · summary`,
-   arrows + Enter).
-3. The quote block lands in the input; press the combo again to append more.
-4. Type your question below the quotes and send.
+**Selection quoting (recommended — matches the Web face)**: in fullscreen,
+dsh-TUI's copy-on-select copies any mouse selection to the clipboard and
+clears the highlight. After selecting, press `Ctrl+Alt+Q` — the **first
+picker row is exactly the text you just selected** (`📋 划选/剪贴板 · …`);
+Enter quotes it.
+
+**Whole-message quoting**: `Ctrl+Alt+Q` → picker lists recent messages
+(`#seq me/assistant · summary`, arrows + Enter); mixes freely with the
+selection row and repeats.
+
+Type your question below the quote blocks and send.
+
+> Combo delivery note: the TUI enables the kitty keyboard protocol, so
+> `Ctrl+Alt+Q` arrives reliably as CSI-u on modern terminals (iTerm2 3.5+,
+> kitty, WezTerm, Ghostty, …). If your terminal does not deliver the combo,
+> remap `shortcut` in the row config to any ctrl/alt combo it does deliver.
 
 ### Web (dsh web GUI)
 
@@ -69,9 +80,11 @@ Patch rows replace the whole `config`, so restate every key when overriding:
 - id: quote-followup
   name: dsh-quote-followup
   config:
-    shortcut: ctrl+alt+q   # needs ctrl or alt; avoid reserved combos
-    pickerLimit: 30        # max messages listed
-    quoteMaxChars: 1600    # per-quote truncation bound (chars)
+    shortcut: ctrl+alt+q        # needs ctrl or alt; avoid reserved combos
+    pickerLimit: 30             # max messages listed
+    quoteMaxChars: 1600         # per-quote truncation bound (chars)
+    clipboardReadCommand: ''    # optional custom clipboard reader (/bin/sh -c;
+                                # default probes pbpaste / wl-paste / xclip / xsel)
 ```
 
 ## Known edges

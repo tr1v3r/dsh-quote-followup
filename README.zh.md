@@ -42,10 +42,18 @@ bundle 清单（`dsh.profile.bundles`）加上 `dsh-quote-followup` 后重启即
 
 ### TUI
 
-1. 正常对话（消息进入缓冲）。
-2. `Ctrl+Alt+Q` → 选择器列出最近消息（`#序号 我/助手 · 摘要`，方向键 + Enter）。
-3. 引用块落入输入框；可再次 `Ctrl+Alt+Q` 追加多条。
-4. 在引用块下方写下问题，正常发送。
+**划选引用（推荐，与 Web 面体验一致）**：dsh-TUI 全屏模式下鼠标划选文本会
+自动复制到剪贴板并清除高亮（copy-on-select）。划选后按 `Ctrl+Alt+Q`，
+选择器**第一行就是刚划选的内容**（`📋 划选/剪贴板 · …`），回车即引用。
+
+**整条消息引用**：`Ctrl+Alt+Q` → 选择器列出最近消息（`#序号 我/助手 · 摘要`，
+方向键 + Enter），可与划选行混用、多次追加。
+
+引用块落入输入框后在下方写下问题，正常发送。
+
+> 快捷键送达说明：TUI 启用了 kitty 键盘协议，现代终端（iTerm2 3.5+、kitty、
+> WezTerm、Ghostty 等）下 `Ctrl+Alt+Q` 以 CSI-u 编码可靠送达。若你的终端不发
+> 该组合，在行 config 里把 `shortcut` 换成任意可送达的 ctrl/alt 组合即可。
 
 ### Web（dsh web GUI）
 
@@ -61,9 +69,11 @@ bundle 清单（`dsh.profile.bundles`）加上 `dsh-quote-followup` 后重启即
 - id: quote-followup
   name: dsh-quote-followup
   config:
-    shortcut: ctrl+alt+q   # 需带 ctrl 或 alt；避开保留组合
-    pickerLimit: 30        # 选择器列出的消息数上限
-    quoteMaxChars: 1600    # 单条引用的截断上限（字符）
+    shortcut: ctrl+alt+q        # 需带 ctrl 或 alt；避开保留组合
+    pickerLimit: 30             # 选择器列出的消息数上限
+    quoteMaxChars: 1600         # 单条引用的截断上限（字符）
+    clipboardReadCommand: ''    # 可选：自定义剪贴板读取命令（/bin/sh -c；
+                                # 默认 pbpaste / wl-paste / xclip / xsel 探测）
 ```
 
 ## 已知边界
