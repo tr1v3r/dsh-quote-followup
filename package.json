@@ -1,15 +1,18 @@
 {
   "name": "dsh-quote-followup",
-  "version": "0.2.0",
-  "description": "Quote selected conversation content into a targeted follow-up turn for DeepSeek Harness — a TUI face (message picker + next-input rewrite via the official plugin seams) and a Web face (text-selection quoting into the composer).",
+  "version": "0.2.1",
+  "description": "Quote selected Web conversation text into the DeepSeek Harness composer for targeted follow-up turns.",
   "keywords": [
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "dsh-tui",
+    "web",
     "quote",
     "follow-up"
   ],
+  "scripts": {
+    "test": "node --check lib/index.js && node --check lib/client.js && node test/web-repeat-harness.mjs"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

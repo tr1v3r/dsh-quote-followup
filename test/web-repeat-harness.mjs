@@ -36,6 +36,7 @@ class FakeElement extends FakeTarget {
     this.nodeType = 1;
     this.tagName = tagName.toUpperCase();
     this.parentElement = parentElement;
+    this.lastElementChild = null;
     this.style = {};
     this.attributes = new Map();
     this.id = "";
@@ -82,7 +83,12 @@ const selection = {
   toString() { return this.text; },
   getRangeAt() { return this.range; },
   removeAllRanges() { this.rangeCount = 0; this.anchorNode = null; this.focusNode = null; this.range = null; },
-  addRange(range) { this.rangeCount = 1; this.range = range; this.anchorNode = composer; this.focusNode = composer; }
+  addRange(range) {
+    this.rangeCount = 1;
+    this.range = range;
+    this.anchorNode = range.selectedNode;
+    this.focusNode = range.selectedNode;
+  }
 };
 
 composer.focus = () => {
@@ -91,8 +97,13 @@ composer.focus = () => {
 composer.addEventListener("paste", (event) => {
   const text = event.clipboardData?.getData("text/plain") ?? "";
   if (text === "") return;
+  // Mirror the real Lexical boundary: an empty editor accepts a root caret,
+  // but once a paragraph exists a caret AFTER that block is not a Lexical
+  // RangeSelection, so the root paste listener ignores the event.
+  if (editorDraft !== "" && selection.anchorNode === composer) return;
   event.preventDefault();
   editorDraft += text;
+  composer.lastElementChild ??= new FakeElement("p", composer);
 });
 
 const makeTranscriptRange = () => ({
@@ -100,9 +111,14 @@ const makeTranscriptRange = () => ({
   getBoundingClientRect: () => ({ left: 100, top: 100, bottom: 120, width: 80, height: 20 })
 });
 const makeComposerRange = () => ({
-  selectNodeContents() {},
+  selectedNode: null,
+  selectNodeContents(node) { this.selectedNode = node; },
   collapse() {},
-  insertNode(node) { editorDraft += node.textContent; }
+  insertNode(node) {
+    // Lexical's mutation observer drops bare text inserted at the root after
+    // existing block children — exactly the production regression.
+    if (editorDraft === "" || this.selectedNode !== composer) editorDraft += node.textContent;
+  }
 });
 
 const documentTarget = new FakeTarget();
