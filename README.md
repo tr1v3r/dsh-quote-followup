@@ -2,7 +2,16 @@
 
 English | [中文](README.zh.md)
 
+[![npm version](https://img.shields.io/npm/v/dsh-quote-followup.svg)](https://www.npmjs.com/package/dsh-quote-followup)
+[![license](https://img.shields.io/npm/l/dsh-quote-followup.svg)](LICENSE)
+
 A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin for quoting selected conversation text into the composer and asking a focused follow-up.
+
+<p align="center">
+  <img src="docs/assets/quote-followup-demo.gif" width="960" alt="Select conversation excerpts, insert native DSH quote chips, and write a focused follow-up">
+</p>
+
+<p align="center"><strong>Select. Quote. Follow up.</strong></p>
 
 ## Features
 
@@ -15,6 +24,8 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 TUI is intentionally unsupported.
 
 ## Install
+
+Requires DSH `>=0.1.2-rc.1`.
 
 ```bash
 dsh plugin --profile web add dsh-quote-followup

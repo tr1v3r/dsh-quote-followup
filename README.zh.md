@@ -2,7 +2,16 @@
 
 [English](README.md) | 中文
 
+[![npm version](https://img.shields.io/npm/v/dsh-quote-followup.svg)](https://www.npmjs.com/package/dsh-quote-followup)
+[![license](https://img.shields.io/npm/l/dsh-quote-followup.svg)](LICENSE)
+
 一个仅支持 Web 的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件：选中对话文本，将其追加到输入框，再进行针对性追问。
+
+<p align="center">
+  <img src="docs/assets/quote-followup-demo.gif" width="960" alt="划选对话片段，插入 DSH 原生引用 chip，再输入针对性追问">
+</p>
+
+<p align="center"><strong>划选、引用、继续追问。</strong></p>
 
 ## 功能
 
@@ -15,6 +24,8 @@
 本插件不再适配 TUI。
 
 ## 安装
+
+要求 DSH `>=0.1.2-rc.1`。
 
 ```bash
 dsh plugin --profile web add dsh-quote-followup
