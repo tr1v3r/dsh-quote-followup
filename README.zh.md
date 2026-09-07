@@ -7,9 +7,10 @@
 ## 功能
 
 - 在 Web 对话区选中文本后显示浮动的 **❐ 引用** 按钮。
-- 以 Markdown 引用块追加到现有草稿，不覆盖已输入内容。
-- 可连续引用多段内容，再统一编辑并发送。
-- 直接派发 DSH 当前 Lexical editor 的 `PASTE_COMMAND`，在 Chromium 与 Firefox 中同步更新编辑器模型和 DOM。
+- 以 DSH 原生对话引用 chip 追加到现有草稿，不覆盖已输入内容。
+- chip 使用与 `@文件` / `@对话` 相同的 `ReferenceChipNode`、对话图标和业务色，可整体删除。
+- 可连续引用多段内容；发送时由插件 codec 将各 chip 展开为模型可读的 Markdown 引用块。
+- 旧版 DSH 缺少原生 chip 能力时，自动降级为纯文本引用。
 
 本插件不再适配 TUI。
 
@@ -26,7 +27,7 @@ dsh plugin --profile web add dsh-quote-followup
 1. 在对话消息中划选任意片段。
 2. 点击 **❐ 引用**。
 3. 如需补充，可继续选中并引用其他片段。
-4. 在引用块下输入追问并发送。
+4. 在引用 chip 后输入追问并发送。
 
 ## 开发验证
 
@@ -34,7 +35,7 @@ dsh plugin --profile web add dsh-quote-followup
 npm test
 ```
 
-回归测试覆盖连续引用、Firefox 丢弃构造参数中的 `clipboardData`、Lexical 回滚裸 DOM fallback，以及热替换后新版 client 接管旧按钮/单例状态。
+回归测试覆盖原生引用 chip、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
 
 ## 许可证
 

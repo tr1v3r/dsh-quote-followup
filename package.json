@@ -1,6 +1,6 @@
 {
   "name": "dsh-quote-followup",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Quote selected Web conversation text into the DeepSeek Harness composer for targeted follow-up turns.",
   "keywords": [
     "dsh",
@@ -44,13 +44,15 @@
   },
   "dsh": {
     "engines": {
-      "dsh": ">=0.1.1-rc.1"
+      "dsh": ">=0.1.2-rc.1"
     },
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "inject": [],
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-input-trigger"
+      ],
       "platform": "web"
     }
   }

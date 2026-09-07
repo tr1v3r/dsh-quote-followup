@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 let syntheticClipboardEnabled = true;
+let nativeChipEnabled = true;
 
 class FakeEvent {
   constructor(type, init = {}) {
@@ -85,6 +86,33 @@ let editorDraft = "";
 let focusSawClearedTranscript = false;
 let rawFallbackEnabled = true;
 
+class FakeTextNode {
+  constructor(text) { this.text = text; }
+  getTextContent() { return this.text; }
+  selectEnd() {}
+}
+class FakeReferenceChipNode {
+  constructor(insert) { this.insert = insert; }
+  getTextContent() { return this.insert.clipboardText; }
+}
+class FakeParagraphNode {
+  children = [];
+  append(...nodes) {
+    this.children.push(...nodes);
+    composer.lastElementChild ??= new FakeElement("p", composer);
+    editorDraft = root.getTextContent();
+  }
+  getTextContent() { return this.children.map((node) => node.getTextContent()).join(""); }
+}
+class FakeRootNode {
+  children = [];
+  append(...nodes) { this.children.push(...nodes); editorDraft = this.getTextContent(); }
+  getLastChild() { return this.children.at(-1) ?? null; }
+  getTextContent() { return this.children.map((node) => node.getTextContent()).join("\n"); }
+  clear() { this.children = []; editorDraft = ""; }
+}
+const root = new FakeRootNode();
+
 const selection = {
   isCollapsed: false,
   rangeCount: 1,
@@ -109,9 +137,6 @@ composer.focus = () => {
 composer.addEventListener("paste", (event) => {
   const text = event.clipboardData?.getData("text/plain") ?? "";
   if (text === "") return;
-  // Mirror the real Lexical boundary: an empty editor accepts a root caret,
-  // but once a paragraph exists a caret AFTER that block is not a Lexical
-  // RangeSelection, so the root paste listener ignores the event.
   if (editorDraft !== "" && selection.anchorNode === composer) return;
   event.preventDefault();
   editorDraft += text;
@@ -127,8 +152,6 @@ const makeComposerRange = () => ({
   selectNodeContents(node) { this.selectedNode = node; },
   collapse() {},
   insertNode(node) {
-    // Lexical reconciliation may drop every raw DOM fallback (Firefox case),
-    // and always drops a root-after-block insertion once content exists.
     if (rawFallbackEnabled && (editorDraft === "" || this.selectedNode !== composer)) editorDraft += node.textContent;
   }
 });
@@ -169,17 +192,54 @@ Object.assign(globalThis, {
   DataTransfer: FakeDataTransfer
 });
 
+const pasteCommand = { type: "PASTE_COMMAND" };
+const nativeNodes = new Map([
+  ["reference-chip", { klass: FakeReferenceChipNode }],
+  ["text", { klass: FakeTextNode }],
+  ["paragraph", { klass: FakeParagraphNode }]
+]);
+composer.__lexicalEditor = {
+  get _nodes() { return nativeChipEnabled ? nativeNodes : new Map(); },
+  _commands: new Map([[pasteCommand, true]]),
+  _editorState: { _nodeMap: new Map([["root", root]]) },
+  _pendingEditorState: null,
+  update(fn) {
+    this._pendingEditorState = this._editorState;
+    try { fn(); } finally { this._pendingEditorState = null; }
+  },
+  dispatchCommand(command, event) {
+    if (command !== pasteCommand) return false;
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (text === "") return false;
+    event.preventDefault();
+    editorDraft += text;
+    composer.lastElementChild ??= new FakeElement("p", composer);
+    return true;
+  }
+};
+
 await import(`../lib/client.js?repeat-test=${Date.now()}`);
 assert.equal(typeof clientModule?.apply, "function");
+assert.deepEqual(clientModule.inject, ["inputTriggers"]);
 
-// A browser tab may retain the old boolean singleton and old shared-id button
-// while the Web server restarts. The new client must take ownership instead of
-// treating that stale marker as proof that the current version is mounted.
+let quoteSource = null;
+const inputTriggers = {
+  registerSource(source) {
+    assert.equal(source.name, "quote-followup");
+    quoteSource = source;
+    return () => { if (quoteSource === source) quoteSource = null; };
+  }
+};
+
 const staleButton = new FakeElement("button");
 staleButton.id = "dsh-quote-followup-btn";
 document.body.appendChild(staleButton);
 globalThis[Symbol.for("dsh-quote-followup.mounted")] = true;
-clientModule.apply({ effect() {} });
+clientModule.apply({
+  get(name) { assert.equal(name, "inputTriggers"); return inputTriggers; },
+  effect(setup) { return setup(); }
+});
+assert.ok(quoteSource, "quote codec source registered");
 
 const quote = (text) => {
   selection.isCollapsed = false;
@@ -198,35 +258,38 @@ const quote = (text) => {
   assert.equal(focusSawClearedTranscript, true, "transcript selection cleared before composer focus");
 };
 
+// Native path: repeated selections become DSH ReferenceChipNode instances.
 quote("first fragment");
 quote("second fragment");
-
+const paragraph = root.getLastChild();
+const chips = paragraph.children.filter((node) => node instanceof FakeReferenceChipNode);
+assert.equal(chips.length, 2);
+assert.equal(chips[0].insert.source, "quote-followup");
+assert.equal(chips[0].insert.appearance, "session");
+assert.match(chips[0].insert.label, /first fragment/);
 assert.match(editorDraft, /> first fragment/);
 assert.match(editorDraft, /> second fragment/);
-assert.equal((editorDraft.match(/> \[引用/g) ?? []).length, 2);
+assert.equal(await quoteSource.codec.serialize(chips[0].insert.ref), chips[0].insert.clipboardText);
 
-// Firefox can reject constructor-injected clipboardData. A Lexical-backed
-// composer must therefore take the editor command path before DOM fallbacks.
-editorDraft = "";
+// Existing draft receives a separating space before the native chip.
+root.clear();
 composer.lastElementChild = null;
+const draftParagraph = new FakeParagraphNode();
+root.append(draftParagraph);
+draftParagraph.append(new FakeTextNode("existing draft"));
+quote("after draft");
+assert.match(editorDraft, /^existing draft > \[引用/);
+
+// Firefox fallback remains safe when the host has no native chip node.
+root.clear();
+composer.lastElementChild = null;
+editorDraft = "";
+nativeChipEnabled = false;
 syntheticClipboardEnabled = false;
 rawFallbackEnabled = false;
-const pasteCommand = { type: "PASTE_COMMAND" };
-composer.__lexicalEditor = {
-  _commands: new Map([[pasteCommand, true]]),
-  dispatchCommand(command, event) {
-    if (command !== pasteCommand) return false;
-    const text = event.clipboardData?.getData("text/plain") ?? "";
-    if (text === "") return false;
-    event.preventDefault();
-    editorDraft += text;
-    composer.lastElementChild ??= new FakeElement("p", composer);
-    return true;
-  }
-};
 quote("firefox first fragment");
 quote("firefox second fragment");
 assert.match(editorDraft, /> firefox first fragment/);
 assert.match(editorDraft, /> firefox second fragment/);
 assert.equal((editorDraft.match(/> \[引用/g) ?? []).length, 2);
-console.log("[web-repeat] Chromium fallback + Firefox Lexical command + stale takeover PASS");
+console.log("[web-repeat] native quote chips + draft spacing + Firefox fallback + stale takeover PASS");

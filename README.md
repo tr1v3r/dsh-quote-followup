@@ -7,9 +7,10 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 ## Features
 
 - Select text inside the Web conversation transcript to reveal a floating **Quote** button.
-- Append the selection as a Markdown quote without replacing the existing draft.
-- Repeat the action to collect multiple excerpts before sending.
-- Dispatch DSH's live Lexical `PASTE_COMMAND` directly, keeping the editor model and rendered composer in sync across Chromium and Firefox.
+- Append a native DSH conversation-reference chip without replacing the existing draft.
+- Reuse the same atomic `ReferenceChipNode`, conversation icon, and business color as `@file` / `@session`.
+- Quote multiple excerpts; on send, the plugin codec expands each chip into a model-readable Markdown blockquote.
+- Fall back to a plain-text quote when the host lacks native chip support.
 
 TUI is intentionally unsupported.
 
@@ -26,7 +27,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 1. Select text in a conversation message.
 2. Click **❐ Quote**.
 3. Select and quote more excerpts if needed.
-4. Type the follow-up below the inserted quotes and send.
+4. Type the follow-up after the inserted chips and send.
 
 ## Development
 
@@ -34,7 +35,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 npm test
 ```
 
-The regression harness covers repeated quotes, Firefox rejecting constructor-injected `clipboardData`, Lexical reconciliation of raw DOM fallbacks, and takeover from a stale client button/singleton after a hot swap.
+The regression harness covers native quote chips, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
 
 ## License
 
