@@ -20,6 +20,7 @@
 - chip 使用与 `@文件` / `@对话` 相同的 `ReferenceChipNode`、对话图标和业务色，可整体删除。
 - chip 只展示摘录正文，引用语义由气泡图标表达，减少重复标签。
 - 浮动按钮和发送时的引用框架跟随 DSH 当前语言。
+- 选中内容来自 DSH 聊天行时，序列化引用会附带对话轮次编号，模型可定位"第 3 轮引用的内容"；无轮次标记时保持原有框架。
 - 可连续引用多段内容；发送时由插件 codec 将各 chip 展开为模型可读的 Markdown 引用块。
 - 旧版 DSH 缺少原生 chip 能力时，自动降级为纯文本引用。
 
@@ -29,7 +30,7 @@
 
 这是一个 Web 客户端侧扩展。composer 和发送路径由浏览器 client 拥有：chip 只存在于 Lexical 编辑器中，模型只会看到发送时 codec 展开的 Markdown 引用块，永远不会看到 chip 本身，不涉及任何 host 侧插件接口。
 
-chip 刻意只存文本：包含摘录正文、仅供显示的角色提示和截断标记，不含 session-message 引用，因此在 compaction 折叠与会话轮转后依然有效。
+chip 刻意只存文本：包含摘录正文、仅供显示的角色提示、可用的对话轮次编号和截断标记，不含全局 session-message 引用，因此在 compaction 折叠与会话轮转后依然有效。
 
 
 ## 安装
@@ -55,7 +56,7 @@ dsh plugin --profile web add dsh-quote-followup
 npm test
 ```
 
-回归测试覆盖精简的原生引用 chip、中英文 locale 切换、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
+回归测试覆盖精简的原生引用 chip、中英文 locale 切换、轮次溯源与降级、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
 
 ## 许可证
 

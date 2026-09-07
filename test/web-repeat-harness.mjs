@@ -61,6 +61,7 @@ class FakeElement extends FakeTarget {
     let cursor = this;
     while (cursor !== null) {
       if (selector === '[data-slot="conversation.session"]' && cursor.isTranscript) return cursor;
+      if (selector === "[data-chat-turn]" && cursor.attributes.has("data-chat-turn")) return cursor;
       cursor = cursor.parentElement;
     }
     return null;
@@ -80,6 +81,14 @@ const elementsById = new Map();
 const transcript = new FakeElement("section");
 transcript.isTranscript = true;
 const startNode = { nodeType: 3, parentElement: transcript };
+// A DSH chat renderer message row: carries the per-session turn ordinal that
+// the plugin resolves into serialized provenance.
+const turnRow = new FakeElement("article", transcript);
+turnRow.setAttribute("data-chat-turn", "3");
+const turnStartNode = { nodeType: 3, parentElement: turnRow };
+// Invalid marker values must degrade to "no provenance" instead of NaN.
+const badTurnRow = new FakeElement("article", transcript);
+badTurnRow.setAttribute("data-chat-turn", "not-a-number");
 const composer = new FakeElement("div");
 composer.setAttribute("contenteditable", "true");
 let editorDraft = "";
@@ -143,8 +152,8 @@ composer.addEventListener("paste", (event) => {
   composer.lastElementChild ??= new FakeElement("p", composer);
 });
 
-const makeTranscriptRange = () => ({
-  startContainer: startNode,
+const makeTranscriptRange = (selectedNode = startNode) => ({
+  startContainer: selectedNode,
   getBoundingClientRect: () => ({ left: 100, top: 100, bottom: 120, width: 80, height: 20 })
 });
 const makeComposerRange = () => ({
@@ -259,13 +268,13 @@ clientModule.apply({
 assert.ok(quoteSource, "quote codec source registered");
 assert.equal(document.getElementById("dsh-quote-followup-btn").textContent, "❐ Quote");
 
-const quote = (text) => {
+const quote = (text, selectedNode = startNode) => {
   selection.isCollapsed = false;
   selection.rangeCount = 1;
-  selection.anchorNode = startNode;
-  selection.focusNode = startNode;
+  selection.anchorNode = selectedNode;
+  selection.focusNode = selectedNode;
   selection.text = text;
-  selection.range = makeTranscriptRange();
+  selection.range = makeTranscriptRange(selectedNode);
   document.dispatchEvent(new FakeEvent("selectionchange"));
   const button = document.getElementById("dsh-quote-followup-btn");
   assert.ok(button, "quote button mounted");
@@ -302,6 +311,32 @@ root.append(draftParagraph);
 draftParagraph.append(new FakeTextNode("existing draft"));
 quote("after draft");
 assert.match(editorDraft, /^existing draft > \[Quote · conversation\]/);
+
+// A selection inside a chat row carries its turn ordinal into the serialized
+// frame, in both locales, without changing the visible chip label.
+root.clear();
+composer.lastElementChild = null;
+quote("turn three excerpt", turnStartNode);
+const turnChip = root.getLastChild().children.find((node) => node instanceof FakeReferenceChipNode);
+assert.equal(turnChip.insert.label, "turn three excerpt");
+assert.deepEqual(JSON.parse(turnChip.insert.ref), {
+  text: "turn three excerpt",
+  role: null,
+  truncated: false,
+  turn: 3
+});
+assert.equal(await quoteSource.codec.serialize(turnChip.insert.ref), "> [Quote · conversation · turn 3]\n> turn three excerpt\n\n");
+activeLocale = "zh";
+assert.equal(await quoteSource.codec.serialize(turnChip.insert.ref), "> [引用 · 对话 · 第 3 轮]\n> turn three excerpt\n\n");
+activeLocale = "en";
+
+// An unparsable turn marker degrades to the provenance-free frame.
+root.clear();
+composer.lastElementChild = null;
+quote("no provenance excerpt", (() => ({ nodeType: 3, parentElement: badTurnRow }))());
+const plainChip = root.getLastChild().children.find((node) => node instanceof FakeReferenceChipNode);
+assert.equal(JSON.parse(plainChip.insert.ref).turn, null);
+assert.equal(await quoteSource.codec.serialize(plainChip.insert.ref), "> [Quote · conversation]\n> no provenance excerpt\n\n");
 
 // Firefox fallback remains safe when the host has no native chip node.
 root.clear();
