@@ -20,6 +20,7 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 - Reuse the same atomic `ReferenceChipNode`, conversation icon, and business color as `@file` / `@session`.
 - Keep each chip compact by showing only the excerpt; the bubble icon already conveys that it is a quote.
 - Follow the active DSH locale for the floating action and serialized quote frame.
+- Attach the conversation turn number to the serialized frame when the selection comes from a DSH chat row, so follow-ups like "revisit turn 3" stay resolvable. Selections without a turn marker keep the provenance-free frame.
 - Quote multiple excerpts; on send, the plugin codec expands each chip into a model-readable Markdown blockquote.
 - Fall back to a plain-text quote when the host lacks native chip support.
 
@@ -29,7 +30,7 @@ TUI is intentionally unsupported.
 
 This is a Web client-side extension. The composer and send path are owned by the browser client: chips exist only in the Lexical editor, and the model only ever sees the Markdown blockquotes the codec expands at send time — never the chips themselves. No host-side plugin surface is involved.
 
-Chips are text-only by design. They carry the excerpt, a display-only role hint, and a truncation flag — no session-message references — so they stay valid across compaction folds and session rotation.
+Chips are text-only by design. They carry the excerpt, a display-only role hint, the conversation turn ordinal when it is available, and a truncation flag — no global session-message references — so they stay valid across compaction folds and session rotation.
 
 
 ## Install
@@ -55,7 +56,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 npm test
 ```
 
-The regression harness covers compact native quote chips, locale switching, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
+The regression harness covers compact native quote chips, locale switching, turn-number provenance with graceful degradation, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
 
 ## License
 
