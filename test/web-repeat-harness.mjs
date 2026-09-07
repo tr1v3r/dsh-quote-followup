@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 let syntheticClipboardEnabled = true;
 let nativeChipEnabled = true;
+let lexicalPasteEnabled = true;
 
 class FakeEvent {
   constructor(type, init = {}) {
@@ -18,10 +19,9 @@ class FakeEvent {
 
 class FakeClipboardEvent extends FakeEvent {
   constructor(type, init = {}) {
+    // Firefox drops the clipboardData ctor option but leaves the property
+    // reconfigurable, so pasteIntoEditor can re-attach a DataTransfer.
     super(type, { ...init, clipboardData: syntheticClipboardEnabled ? init.clipboardData : null });
-    if (!syntheticClipboardEnabled) {
-      Object.defineProperty(this, "clipboardData", { value: null, configurable: false });
-    }
   }
 }
 
@@ -89,6 +89,10 @@ const turnStartNode = { nodeType: 3, parentElement: turnRow };
 // Invalid marker values must degrade to "no provenance" instead of NaN.
 const badTurnRow = new FakeElement("article", transcript);
 badTurnRow.setAttribute("data-chat-turn", "not-a-number");
+// A message row carrying a role marker, for localized serialized headers.
+const userRow = new FakeElement("article", transcript);
+userRow.setAttribute("data-role", "user");
+const userRoleNode = { nodeType: 3, parentElement: userRow };
 const composer = new FakeElement("div");
 composer.setAttribute("contenteditable", "true");
 let editorDraft = "";
@@ -209,7 +213,7 @@ const nativeNodes = new Map([
 ]);
 composer.__lexicalEditor = {
   get _nodes() { return nativeChipEnabled ? nativeNodes : new Map(); },
-  _commands: new Map([[pasteCommand, true]]),
+  get _commands() { return lexicalPasteEnabled ? new Map([[pasteCommand, true]]) : new Map(); },
   _editorState: { _nodeMap: new Map([["root", root]]) },
   _pendingEditorState: null,
   update(fn) {
@@ -256,7 +260,13 @@ const locale = {
 const staleButton = new FakeElement("button");
 staleButton.id = "dsh-quote-followup-btn";
 document.body.appendChild(staleButton);
-globalThis[Symbol.for("dsh-quote-followup.mounted")] = true;
+// Simulate a previously mounted client instance so apply() must dispose it
+// before taking over (the singleton no-op/dispose branch from AGENTS.md #6).
+let staleStateDisposed = false;
+globalThis[Symbol.for("dsh-quote-followup.state")] = {
+  version: "0.0.0",
+  dispose() { staleStateDisposed = true; }
+};
 clientModule.apply({
   get(name) {
     if (name === "inputTriggers") return inputTriggers;
@@ -265,6 +275,7 @@ clientModule.apply({
   },
   effect(setup) { return setup(); }
 });
+assert.equal(staleStateDisposed, true, "stale singleton state disposed on takeover");
 assert.ok(quoteSource, "quote codec source registered");
 assert.equal(document.getElementById("dsh-quote-followup-btn").textContent, "❐ Quote");
 
@@ -338,11 +349,29 @@ const plainChip = root.getLastChild().children.find((node) => node instanceof Fa
 assert.equal(JSON.parse(plainChip.insert.ref).turn, null);
 assert.equal(await quoteSource.codec.serialize(plainChip.insert.ref), "> [Quote · conversation]\n> no provenance excerpt\n\n");
 
-// Firefox fallback remains safe when the host has no native chip node.
+// A role marker localizes the serialized header; the chip label stays clean.
+root.clear();
+composer.lastElementChild = null;
+quote("user role excerpt", userRoleNode);
+const roleChip = root.getLastChild().children.find((node) => node instanceof FakeReferenceChipNode);
+assert.equal(roleChip.insert.label, "user role excerpt");
+assert.equal(await quoteSource.codec.serialize(roleChip.insert.ref), "> [Quote · user]\n> user role excerpt\n\n");
+activeLocale = "zh";
+assert.equal(await quoteSource.codec.serialize(roleChip.insert.ref), "> [引用 · 用户]\n> user role excerpt\n\n");
+activeLocale = "en";
+
+// Malformed chip refs degrade to an empty projection instead of throwing.
+assert.equal(await quoteSource.codec.serialize("not json"), "");
+assert.equal(quoteSource.codec.clipboardText("not json"), "");
+assert.equal(await quoteSource.codec.serialize(JSON.stringify({ text: 42 })), "");
+
+// Firefox fallback: no native chip node AND no Lexical paste command, so the
+// quote must survive the synthetic ClipboardEvent path (DataTransfer re-attach).
 root.clear();
 composer.lastElementChild = null;
 editorDraft = "";
 nativeChipEnabled = false;
+lexicalPasteEnabled = false;
 syntheticClipboardEnabled = false;
 rawFallbackEnabled = false;
 quote("firefox first fragment");

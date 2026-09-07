@@ -57,13 +57,16 @@ any tabs that stayed open across the restart.
 
 `lib/client.js` is a single self-contained browser module loaded through
 `window.__ModuleLoader__.load({ id, factory })`. It is **pure DOM** (no React, no Lexical,
-no framework import); its only injected dependency is DSH's `inputTriggers` service.
+no framework import); its injected dependencies are DSH's `inputTriggers` and `locale`
+services, both optional.
 
 It exports:
 
-- `inject: ["inputTriggers"]` — tells the DSH web client runtime that this module depends on
-  the `inputTriggers` service. The `package.json` `dsh.client.inject` enables the
-  `@deepseek-ai/dsh-client-ui-input-trigger` bundle so `ctx.get("inputTriggers")` exists.
+- `inject: ["inputTriggers", "locale"]` — tells the DSH web client runtime which host
+  services this module needs. The `package.json` `dsh.client.inject` enables the
+  `@deepseek-ai/dsh-client-ui-input-trigger` bundle so `ctx.get("inputTriggers")` exists;
+  `locale` supplies the floating-action and serialized-frame copy and is optional (the
+  module falls back to English when it is absent).
 - `apply(ctx)` — the entry point invoked by the web client runtime.
 
 ### Constants
@@ -75,7 +78,9 @@ It exports:
 | `BUTTON_ID` / `BUTTON_VERSION_ATTR` | Shared DOM id + version attr for the floating button. |
 | `CLIENT_VERSION` | Must equal `package.json` `version`. |
 | `QUOTE_SOURCE` | `"quote-followup"` — codec owner for quote chips. |
+| `LOCALE_NS` / `LOCALE_DICT` | `"quote-followup"` locale namespace and its zh/en copy, registered with the optional `locale` service. |
 | `QUOTE_MAX_CHARS` | `1600` — per-quote character cap. |
+| `walkAncestors` / `isValidTurn` | Shared helpers: ancestor walk from a range endpoint, and the non-negative safe-integer turn predicate. |
 
 ## 4. Quote flow
 
@@ -87,7 +92,8 @@ It exports:
         │  yes, non-collapsed, non-blank text
         ▼
  detectRole()            ── best-effort "user"/"assistant" from data-* / class hints
- pendingQuote = { text, role }
+ detectTurn()            ── per-session turn ordinal from data-chat-turn (nullable)
+ pendingQuote = { text, role, turn }
         │
         ▼
  floating button shown (positioned near the selection rect)
@@ -96,7 +102,7 @@ It exports:
  clear transcript selection BEFORE composer focus   ◄── critical
         │
         ▼
- quotePayload() ── trim + cap (QUOTE_MAX_CHARS) → { text, role, truncated }
+ quotePayload() ── trim + cap (QUOTE_MAX_CHARS) → { text, role, truncated, turn }
         │
         ├──quoteSourceReady && appendQuoteChip()──►  native ReferenceChipNode path
         └──else──────────────────────────────────►  text-blockquote fallback path
@@ -127,7 +133,8 @@ The plugin also registers a **codec-only source** with `inputTriggers.registerSo
 
 `serialize` expands each chip's `ref` (a JSON payload) into the Markdown blockquote frame,
 and `clipboardText` provides the same projection for copy/paste. This is what makes each
-chip readable by the model on send.
+chip readable by the model on send. A malformed or legacy `ref` degrades to an empty
+projection (`""`) instead of throwing, so the send path never crashes on a bad chip.
 
 ### 4.2 Text fallback path
 

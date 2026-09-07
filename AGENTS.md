@@ -36,7 +36,9 @@ Transpile/Bundler output into the repo.
 ## Non-negotiable invariants
 
 1. **No framework.** `lib/client.js` is pure DOM and carries no React/Lexical runtime.
-   Its module-level export is `inject: ["inputTriggers"]` plus an `apply(ctx)` function.
+   Its module-level export is `inject: ["inputTriggers", "locale"]` plus an `apply(ctx)`
+   function. Both services are optional: when `locale` is absent the module falls back to
+   English copy, and when `inputTriggers` is absent it degrades to the text fallback.
    Never import a second React or Lexical instance.
 2. **Web-only.** If a change only makes sense on the timeline of a TUI, it does not belong here.
 3. **Don't mutate the transcript selection before composer focus.** Clear the transcript
@@ -53,9 +55,10 @@ Transpile/Bundler output into the repo.
    `version`. `apply()` no-ops when the mounted state is the same version, disposes a
    previous one otherwise, and `ensureButton()` takes over a stale shared-id button via
    `data-dsh-quote-followup-version`. Bump both together.
-7. **Codec ownership.** The quote codec source (`QUOTE_TRIGGER_SOURCE`) owns quote chips but
+7. **Codec ownership.** The quote codec source (`QUOTE_SOURCE`) owns quote chips but
    deliberately returns **no `@` candidates** (`candidates: () => Promise.resolve([])`).
-   Keep it that way.
+   Keep it that way. The codec must degrade gracefully: a malformed chip `ref` resolves to
+   an empty projection instead of throwing.
 
 ## Testing policy
 
