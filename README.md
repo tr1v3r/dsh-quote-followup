@@ -25,6 +25,13 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 
 TUI is intentionally unsupported.
 
+## Scope
+
+This is a Web client-side extension. The composer and send path are owned by the browser client: chips exist only in the Lexical editor, and the model only ever sees the Markdown blockquotes the codec expands at send time — never the chips themselves. No host-side plugin surface is involved.
+
+Chips are text-only by design. They carry the excerpt, a display-only role hint, and a truncation flag — no session-message references — so they stay valid across compaction folds and session rotation.
+
+
 ## Install
 
 Requires DSH `>=0.1.2-rc.1`.

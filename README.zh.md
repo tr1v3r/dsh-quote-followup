@@ -25,6 +25,13 @@
 
 本插件不再适配 TUI。
 
+## 边界
+
+这是一个 Web 客户端侧扩展。composer 和发送路径由浏览器 client 拥有：chip 只存在于 Lexical 编辑器中，模型只会看到发送时 codec 展开的 Markdown 引用块，永远不会看到 chip 本身，不涉及任何 host 侧插件接口。
+
+chip 刻意只存文本：包含摘录正文、仅供显示的角色提示和截断标记，不含 session-message 引用，因此在 compaction 折叠与会话轮转后依然有效。
+
+
 ## 安装
 
 要求 DSH `>=0.1.2-rc.1`。
