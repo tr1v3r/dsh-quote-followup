@@ -220,7 +220,7 @@ composer.__lexicalEditor = {
 
 await import(`../lib/client.js?repeat-test=${Date.now()}`);
 assert.equal(typeof clientModule?.apply, "function");
-assert.deepEqual(clientModule.inject, ["inputTriggers"]);
+assert.deepEqual(clientModule.inject, ["inputTriggers", "locale"]);
 
 let quoteSource = null;
 const inputTriggers = {
@@ -231,15 +231,33 @@ const inputTriggers = {
   }
 };
 
+let activeLocale = "en";
+let localeDict = null;
+let localeSubscriber = null;
+const locale = {
+  register(ns, dicts) {
+    assert.equal(ns, "quote-followup");
+    localeDict = dicts;
+    return () => { localeDict = null; };
+  },
+  bind() { return (key) => (localeDict?.[activeLocale] ?? localeDict?.en)?.[key] ?? key; },
+  subscribe(fn) { localeSubscriber = fn; return () => { localeSubscriber = null; }; }
+};
+
 const staleButton = new FakeElement("button");
 staleButton.id = "dsh-quote-followup-btn";
 document.body.appendChild(staleButton);
 globalThis[Symbol.for("dsh-quote-followup.mounted")] = true;
 clientModule.apply({
-  get(name) { assert.equal(name, "inputTriggers"); return inputTriggers; },
+  get(name) {
+    if (name === "inputTriggers") return inputTriggers;
+    if (name === "locale") return locale;
+    throw new Error("unexpected " + name);
+  },
   effect(setup) { return setup(); }
 });
 assert.ok(quoteSource, "quote codec source registered");
+assert.equal(document.getElementById("dsh-quote-followup-btn").textContent, "❐ Quote");
 
 const quote = (text) => {
   selection.isCollapsed = false;
@@ -266,10 +284,15 @@ const chips = paragraph.children.filter((node) => node instanceof FakeReferenceC
 assert.equal(chips.length, 2);
 assert.equal(chips[0].insert.source, "quote-followup");
 assert.equal(chips[0].insert.appearance, "session");
-assert.match(chips[0].insert.label, /first fragment/);
+assert.equal(chips[0].insert.label, "first fragment");
+assert.doesNotMatch(chips[0].insert.label, /^引用|^assistant|^user/);
 assert.match(editorDraft, /> first fragment/);
 assert.match(editorDraft, /> second fragment/);
 assert.equal(await quoteSource.codec.serialize(chips[0].insert.ref), chips[0].insert.clipboardText);
+assert.match(await quoteSource.codec.serialize(chips[0].insert.ref), /^> \[Quote · conversation\]/);
+activeLocale = "zh";
+assert.match(await quoteSource.codec.serialize(chips[0].insert.ref), /^> \[引用 · 对话\]/);
+activeLocale = "en";
 
 // Existing draft receives a separating space before the native chip.
 root.clear();
@@ -278,7 +301,7 @@ const draftParagraph = new FakeParagraphNode();
 root.append(draftParagraph);
 draftParagraph.append(new FakeTextNode("existing draft"));
 quote("after draft");
-assert.match(editorDraft, /^existing draft > \[引用/);
+assert.match(editorDraft, /^existing draft > \[Quote · conversation\]/);
 
 // Firefox fallback remains safe when the host has no native chip node.
 root.clear();
@@ -291,5 +314,5 @@ quote("firefox first fragment");
 quote("firefox second fragment");
 assert.match(editorDraft, /> firefox first fragment/);
 assert.match(editorDraft, /> firefox second fragment/);
-assert.equal((editorDraft.match(/> \[引用/g) ?? []).length, 2);
+assert.equal((editorDraft.match(/> \[Quote · conversation\]/g) ?? []).length, 2);
 console.log("[web-repeat] native quote chips + draft spacing + Firefox fallback + stale takeover PASS");
