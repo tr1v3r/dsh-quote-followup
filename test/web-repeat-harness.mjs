@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 
+let syntheticClipboardEnabled = true;
+
 class FakeEvent {
   constructor(type, init = {}) {
     this.type = type;
@@ -11,6 +13,15 @@ class FakeEvent {
   }
   preventDefault() { if (this.cancelable) this.defaultPrevented = true; }
   stopPropagation() {}
+}
+
+class FakeClipboardEvent extends FakeEvent {
+  constructor(type, init = {}) {
+    super(type, { ...init, clipboardData: syntheticClipboardEnabled ? init.clipboardData : null });
+    if (!syntheticClipboardEnabled) {
+      Object.defineProperty(this, "clipboardData", { value: null, configurable: false });
+    }
+  }
 }
 
 class FakeTarget {
@@ -72,6 +83,7 @@ const composer = new FakeElement("div");
 composer.setAttribute("contenteditable", "true");
 let editorDraft = "";
 let focusSawClearedTranscript = false;
+let rawFallbackEnabled = true;
 
 const selection = {
   isCollapsed: false,
@@ -115,9 +127,9 @@ const makeComposerRange = () => ({
   selectNodeContents(node) { this.selectedNode = node; },
   collapse() {},
   insertNode(node) {
-    // Lexical's mutation observer drops bare text inserted at the root after
-    // existing block children — exactly the production regression.
-    if (editorDraft === "" || this.selectedNode !== composer) editorDraft += node.textContent;
+    // Lexical reconciliation may drop every raw DOM fallback (Firefox case),
+    // and always drops a root-after-block insertion once content exists.
+    if (rawFallbackEnabled && (editorDraft === "" || this.selectedNode !== composer)) editorDraft += node.textContent;
   }
 });
 
@@ -153,12 +165,20 @@ Object.assign(globalThis, {
   HTMLElement: FakeElement,
   Event: FakeEvent,
   InputEvent: FakeEvent,
-  ClipboardEvent: FakeEvent,
+  ClipboardEvent: FakeClipboardEvent,
   DataTransfer: FakeDataTransfer
 });
 
 await import(`../lib/client.js?repeat-test=${Date.now()}`);
 assert.equal(typeof clientModule?.apply, "function");
+
+// A browser tab may retain the old boolean singleton and old shared-id button
+// while the Web server restarts. The new client must take ownership instead of
+// treating that stale marker as proof that the current version is mounted.
+const staleButton = new FakeElement("button");
+staleButton.id = "dsh-quote-followup-btn";
+document.body.appendChild(staleButton);
+globalThis[Symbol.for("dsh-quote-followup.mounted")] = true;
 clientModule.apply({ effect() {} });
 
 const quote = (text) => {
@@ -171,6 +191,7 @@ const quote = (text) => {
   document.dispatchEvent(new FakeEvent("selectionchange"));
   const button = document.getElementById("dsh-quote-followup-btn");
   assert.ok(button, "quote button mounted");
+  assert.notEqual(button, staleButton, "current client replaces a stale shared-id button");
   assert.equal(button.style.display, "block");
   button.dispatchEvent(new FakeEvent("mousedown", { cancelable: true }));
   button.dispatchEvent(new FakeEvent("click", { cancelable: true }));
@@ -183,4 +204,29 @@ quote("second fragment");
 assert.match(editorDraft, /> first fragment/);
 assert.match(editorDraft, /> second fragment/);
 assert.equal((editorDraft.match(/> \[引用/g) ?? []).length, 2);
-console.log("[web-repeat] ALL PASS");
+
+// Firefox can reject constructor-injected clipboardData. A Lexical-backed
+// composer must therefore take the editor command path before DOM fallbacks.
+editorDraft = "";
+composer.lastElementChild = null;
+syntheticClipboardEnabled = false;
+rawFallbackEnabled = false;
+const pasteCommand = { type: "PASTE_COMMAND" };
+composer.__lexicalEditor = {
+  _commands: new Map([[pasteCommand, true]]),
+  dispatchCommand(command, event) {
+    if (command !== pasteCommand) return false;
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (text === "") return false;
+    event.preventDefault();
+    editorDraft += text;
+    composer.lastElementChild ??= new FakeElement("p", composer);
+    return true;
+  }
+};
+quote("firefox first fragment");
+quote("firefox second fragment");
+assert.match(editorDraft, /> firefox first fragment/);
+assert.match(editorDraft, /> firefox second fragment/);
+assert.equal((editorDraft.match(/> \[引用/g) ?? []).length, 2);
+console.log("[web-repeat] Chromium fallback + Firefox Lexical command + stale takeover PASS");

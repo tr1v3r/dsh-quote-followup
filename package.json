@@ -1,6 +1,6 @@
 {
   "name": "dsh-quote-followup",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Quote selected Web conversation text into the DeepSeek Harness composer for targeted follow-up turns.",
   "keywords": [
     "dsh",

@@ -9,7 +9,7 @@
 - 在 Web 对话区选中文本后显示浮动的 **❐ 引用** 按钮。
 - 以 Markdown 引用块追加到现有草稿，不覆盖已输入内容。
 - 可连续引用多段内容，再统一编辑并发送。
-- 通过 Lexical 的 paste 路径更新编辑器模型，避免只改 DOM。
+- 直接派发 DSH 当前 Lexical editor 的 `PASTE_COMMAND`，在 Chromium 与 Firefox 中同步更新编辑器模型和 DOM。
 
 本插件不再适配 TUI。
 
@@ -19,7 +19,7 @@
 dsh plugin --profile web add dsh-quote-followup
 ```
 
-将 `dsh-quote-followup` 加入 Web profile 的 `dsh.profile.bundles`，然后重启 `dsh web`，让服务端重新生成启动时缓存的 client bundle。仅刷新页面不会替换旧服务进程中的 bundle。
+将 `dsh-quote-followup` 加入 Web profile 的 `dsh.profile.bundles`，然后重启 `dsh web`，让服务端重新生成启动时缓存的 client bundle。重启后还需刷新或重新打开此前一直未关闭的浏览器页；旧页面已经加载的 JavaScript 不会从新服务进程自动更新。
 
 ## 使用
 
@@ -34,7 +34,7 @@ dsh plugin --profile web add dsh-quote-followup
 npm test
 ```
 
-回归测试覆盖历史问题：“第一次引用成功，第二次消失”。根因是编辑器已有段落后，caret 不能放在 Lexical root 的 block 之后，必须放进最后一个 block 内。
+回归测试覆盖连续引用、Firefox 丢弃构造参数中的 `clipboardData`、Lexical 回滚裸 DOM fallback，以及热替换后新版 client 接管旧按钮/单例状态。
 
 ## 许可证
 

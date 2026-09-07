@@ -9,7 +9,7 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 - Select text inside the Web conversation transcript to reveal a floating **Quote** button.
 - Append the selection as a Markdown quote without replacing the existing draft.
 - Repeat the action to collect multiple excerpts before sending.
-- Keep the Lexical editor model and rendered composer in sync.
+- Dispatch DSH's live Lexical `PASTE_COMMAND` directly, keeping the editor model and rendered composer in sync across Chromium and Firefox.
 
 TUI is intentionally unsupported.
 
@@ -19,7 +19,7 @@ TUI is intentionally unsupported.
 dsh plugin --profile web add dsh-quote-followup
 ```
 
-Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restart `dsh web` so the server rebuilds its boot-time client bundle.
+Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restart `dsh web` so the server rebuilds its boot-time client bundle. Reload or reopen browser tabs that stayed open across the restart; their already-loaded JavaScript cannot update itself from a new server process.
 
 ## Use
 
@@ -34,7 +34,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 npm test
 ```
 
-The regression harness models the Lexical boundary that caused the historical “first quote works, second quote disappears” bug: once the editor has a block, the caret must be inside its last block rather than after the block at the editor root.
+The regression harness covers repeated quotes, Firefox rejecting constructor-injected `clipboardData`, Lexical reconciliation of raw DOM fallbacks, and takeover from a stale client button/singleton after a hot swap.
 
 ## License
 
