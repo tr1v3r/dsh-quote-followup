@@ -18,6 +18,8 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 - Select text inside the Web conversation transcript to reveal a floating **Quote** button.
 - Append a native DSH conversation-reference chip without replacing the existing draft.
 - Reuse the same atomic `ReferenceChipNode`, conversation icon, and business color as `@file` / `@session`.
+- Keep each chip compact by showing only the excerpt; the bubble icon already conveys that it is a quote.
+- Follow the active DSH locale for the floating action and serialized quote frame.
 - Quote multiple excerpts; on send, the plugin codec expands each chip into a model-readable Markdown blockquote.
 - Fall back to a plain-text quote when the host lacks native chip support.
 
@@ -46,7 +48,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 npm test
 ```
 
-The regression harness covers native quote chips, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
+The regression harness covers compact native quote chips, locale switching, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
 
 ## License
 

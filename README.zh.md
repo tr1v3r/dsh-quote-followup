@@ -18,6 +18,8 @@
 - 在 Web 对话区选中文本后显示浮动的 **❐ 引用** 按钮。
 - 以 DSH 原生对话引用 chip 追加到现有草稿，不覆盖已输入内容。
 - chip 使用与 `@文件` / `@对话` 相同的 `ReferenceChipNode`、对话图标和业务色，可整体删除。
+- chip 只展示摘录正文，引用语义由气泡图标表达，减少重复标签。
+- 浮动按钮和发送时的引用框架跟随 DSH 当前语言。
 - 可连续引用多段内容；发送时由插件 codec 将各 chip 展开为模型可读的 Markdown 引用块。
 - 旧版 DSH 缺少原生 chip 能力时，自动降级为纯文本引用。
 
@@ -46,7 +48,7 @@ dsh plugin --profile web add dsh-quote-followup
 npm test
 ```
 
-回归测试覆盖原生引用 chip、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
+回归测试覆盖精简的原生引用 chip、中英文 locale 切换、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
 
 ## 许可证
 
