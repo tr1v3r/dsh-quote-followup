@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/dsh-quote-followup.svg)](https://www.npmjs.com/package/dsh-quote-followup)
 [![license](https://img.shields.io/npm/l/dsh-quote-followup.svg)](LICENSE)
+[![DSH Market](https://raw.githubusercontent.com/2BingLing/dsh-market/master/assets/readme/badge-listed-zh.svg)](https://dsh.market/)
 
 一个仅支持 Web 的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件：选中对话文本，将其追加到输入框，再进行针对性追问。
 

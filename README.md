@@ -4,6 +4,7 @@ English | [中文](README.zh.md)
 
 [![npm version](https://img.shields.io/npm/v/dsh-quote-followup.svg)](https://www.npmjs.com/package/dsh-quote-followup)
 [![license](https://img.shields.io/npm/l/dsh-quote-followup.svg)](LICENSE)
+[![DSH Market](https://raw.githubusercontent.com/2BingLing/dsh-market/master/assets/readme/badge-listed-en.svg)](https://dsh.market/)
 
 A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin for quoting selected conversation text into the composer and asking a focused follow-up.
 
