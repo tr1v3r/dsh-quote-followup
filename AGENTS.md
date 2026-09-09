@@ -19,6 +19,8 @@ Agent-facing project instructions for **dsh-quote-followup**.
 | `cordis.patch.yml` | Web profile bundle patch that inserts the `quote-followup` row. |
 | `test/web-repeat-harness.mjs` | Self-contained fake-DOM regression harness for `lib/client.js`. |
 | `package.json` | Package metadata, `dsh` wiring, `npm test`, publishes `/lib` + `cordis.patch.yml`. |
+| `screenshots.json` | **Not part of the npm package.** Declares the storefront screenshot(s) for [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin); paths are relative to this file and follow the default branch, so replacing the asset refreshes the listing without an upstream PR. |
+| `docs/assets/quote-followup-demo.gif` | Demo asset referenced by `screenshots.json` and the READMEs. |
 | `README.md`, `README.zh.md` | User-facing docs. Keep in sync with each other. |
 | `ARCHITECTURE.md` | Deep-dive on the runtime architecture, integration and fallback paths. |
 
