@@ -203,10 +203,12 @@ prerequisites. `test/run-assembled-web.mjs` verifies the DSH checkout sits at th
 revision with a clean tracked tree, copies `test/integration/assembled-web.ts` into a
 temporary scenario directory under that checkout's `apps/web/tests/`, mounts this plugin
 from its local `lib/index.js` through a generated overlay, and runs DSH's own
-Vitest+Playwright configuration. The scenario drives a real Chromium and asserts:
+Vitest+Playwright configuration with an include restricted to the current scenario.
+The generated scenario uses a plain TypeScript filename, keeping interrupted-run residues
+outside the standard Web discovery patterns. The scenario drives a real Chromium and asserts:
 
-- Existing drafts survive repeated native quote insertions; undo changes the document and
-  redo restores it (grouping follows the editor's native history policy).
+- Existing drafts survive repeated native quote insertions; after the pinned 1000 ms history window, undo restores exactly the first chip and
+  redo restores the complete draft.
 - Drafts stay scoped per session and restore correctly on switch-back.
 - The real client prompt request contains the question and the expanded Markdown quote,
   and never raw chip markup; the request is intercepted and aborted before any model call.
