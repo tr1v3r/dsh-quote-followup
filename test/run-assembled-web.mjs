@@ -1,7 +1,7 @@
 // Copyright (c) 2026 foo-hao. SPDX-License-Identifier: MIT
 import { mkdtemp, copyFile, rm, realpath, writeFile } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -20,12 +20,17 @@ if (changes.status !== 0 || changes.stdout.trim() !== '') {
 const plugin = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporary = await mkdtemp(join(dsh, 'apps/web/tests/quote-followup-integration-'));
 try {
-  const scenario = join(temporary, 'quote-followup.e2e.ts');
+  const scenario = join(temporary, 'quote-followup.ts');
   await copyFile(join(plugin, 'test/integration/assembled-web.ts'), scenario);
   const overlay = join(temporary, 'plugin.overlay.yml');
   await writeFile(overlay, '- insert:\n    - id: quote-followup\n      name: ' + JSON.stringify(join(plugin, 'lib/index.js')) + '\n');
+  // Keep interrupted runs outside DSH's broad *.e2e.ts discovery glob.
+  // Each invocation selects only its own scenario through an inherited config.
+  const config = join(temporary, 'vitest.config.mjs');
+  await writeFile(config, 'import base from ' + JSON.stringify('../../../../vitest.web.config.ts') + ';\n' +
+    'export default { ...base, test: { ...base.test, include: [' + JSON.stringify(relative(dsh, scenario).split(sep).join('/')) + '] } };\n');
   const child = spawn(process.execPath, [join(dsh, 'node_modules/vitest/vitest.mjs'), 'run', '--reporter=verbose', '--config',
-    join(dsh, 'vitest.web.config.ts'), scenario], {
+    config, scenario], {
     cwd: dsh,
     env: { ...process.env, DSH_SNAPSHOT: 'replay', DSH_QUOTE_PLUGIN_ROOT: plugin, DSH_QUOTE_OVERLAY: overlay },
     stdio: 'inherit',
