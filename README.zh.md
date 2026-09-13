@@ -59,8 +59,8 @@ npm test
 
 回归测试覆盖精简的原生引用 chip、中英文 locale 切换、轮次溯源与降级、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
 
+可选的[真实 DSH Web 集成回归](https://github.com/tr1v3r/dsh-quote-followup/blob/master/test/integration/README.md)通过固定版本、已构建的 DSH 和 Chromium 加载插件，验证已有草稿、连续引用、撤销重做、会话隔离、发送序列化及 Host 驱动的不可写输入状态。
+
 ## 许可证
 
 MIT
-
-可选的[真实 DSH Web 集成回归](test/integration/README.md)通过固定版本、已构建的 DSH 和 Chromium 加载插件，验证已有草稿、连续引用、撤销重做、会话隔离、发送序列化及 Host 驱动的不可写输入状态。

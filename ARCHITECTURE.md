@@ -195,6 +195,28 @@ query string) and asserts:
 
 `npm test` runs `node --check lib/index.js`, `node --check lib/client.js`, then the harness.
 
+### 7.1 Assembled DSH Web lane (opt-in)
+
+`npm run test:assembled-web -- --dsh-root <built-checkout>` complements the fake-DOM
+harness with a real assembled DSH Web instance; see `test/integration/README.md` for the
+prerequisites. `test/run-assembled-web.mjs` verifies the DSH checkout sits at the pinned
+revision with a clean tracked tree, copies `test/integration/assembled-web.ts` into a
+temporary scenario directory under that checkout's `apps/web/tests/`, mounts this plugin
+from its local `lib/index.js` through a generated overlay, and runs DSH's own
+Vitest+Playwright configuration. The scenario drives a real Chromium and asserts:
+
+- Existing drafts survive repeated native quote insertions; undo changes the document and
+  redo restores it (grouping follows the editor's native history policy).
+- Drafts stay scoped per session and restore correctly on switch-back.
+- The real client prompt request contains the question and the expanded Markdown quote,
+  and never raw chip markup; the request is intercepted and aborted before any model call.
+- A Host-driven unavailable model route leaves the composer non-editable and the draft
+  untouched; the previous Host setting is restored afterwards.
+
+The temporary scenario is removed on every non-SIGKILL exit path. The lane is pinned to
+one DSH revision — a new revision requires a deliberate compatibility run before the pin
+moves. `test/` stays out of the npm package, so this lane adds no published surface.
+
 ## 8. Change checklist
 
 - Editing the client behavior → edit `lib/client.js`, run `npm test`.

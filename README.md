@@ -59,8 +59,8 @@ npm test
 
 The regression harness covers compact native quote chips, locale switching, turn-number provenance with graceful degradation, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
 
+An opt-in [assembled DSH Web regression](https://github.com/tr1v3r/dsh-quote-followup/blob/master/test/integration/README.md) runs the plugin through a pinned, built DSH checkout with Chromium. It covers existing drafts, repeated quoting, undo/redo, session isolation, prompt serialization, and Host-driven unavailable input.
+
 ## License
 
 MIT
-
-An opt-in [assembled DSH Web regression](test/integration/README.md) runs the plugin through a pinned, built DSH checkout with Chromium. It covers existing drafts, repeated quoting, undo/redo, session isolation, prompt serialization, and Host-driven unavailable input.

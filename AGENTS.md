@@ -18,6 +18,8 @@ Agent-facing project instructions for **dsh-quote-followup**.
 | `lib/index.d.ts` | Type declarations for the host entry. |
 | `cordis.patch.yml` | Web profile bundle patch that inserts the `quote-followup` row. |
 | `test/web-repeat-harness.mjs` | Self-contained fake-DOM regression harness for `lib/client.js`. |
+| `test/run-assembled-web.mjs` | Opt-in runner for the assembled DSH Web regression. It verifies the DSH checkout is at the pinned revision with a clean tracked tree, copies the scenario into a temporary dir under that checkout, and runs DSH's own Vitest+Playwright config. |
+| `test/integration/` | Assembled-Web regression assets: the Playwright scenario (`assembled-web.ts`), its reproduce guide (`README.md`), and a scoped MIT `LICENSE` for fixtures adapted from DSH's MIT-licensed Web tests. Not published to npm. |
 | `package.json` | Package metadata, `dsh` wiring, `npm test`, publishes `/lib` + `cordis.patch.yml`. |
 | `screenshots.json` | **Not part of the npm package.** Declares the storefront screenshot(s) for [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin); paths are relative to this file and follow the default branch, so replacing the asset refreshes the listing without an upstream PR. |
 | `docs/assets/quote-followup-demo.gif` | Demo asset referenced by `screenshots.json` and the READMEs. |
@@ -29,11 +31,14 @@ Agent-facing project instructions for **dsh-quote-followup**.
 ```bash
 npm test            # node --check lib/index.js && node --check lib/client.js && node test/web-repeat-harness.mjs
 node --check lib/client.js   # quick syntax check
+npm run test:assembled-web -- --dsh-root <built-dsh-checkout>   # opt-in assembled lane (pinned DSH revision, Chromium)
 git status          # confirm only intended files changed
 ```
 
 There is **no build step**. `lib/client.js` is the shipped source; do not introduce
-Transpile/Bundler output into the repo.
+Transpile/Bundler output into the repo. The hand-written TypeScript scenario under
+`test/integration/` is not a violation: it is source executed by DSH's own Vitest inside
+the consumer checkout, never transpiled in this repo, and `test/` is not published.
 
 ## Non-negotiable invariants
 
@@ -68,6 +73,11 @@ Transpile/Bundler output into the repo.
 - The harness runs `lib/client.js` against a fake DOM/window/editor, so it catches
   integration regressions (native chips, repeated quoting, draft spacing, codec
   serialization, Firefox fallback, stale singleton/button takeover) without starting `dsh web`.
+- The assembled DSH Web lane (`test:assembled-web`) is **opt-in and not a pre-commit gate**.
+  It needs a built deepseek-harness checkout at the pinned revision with a clean tracked
+  tree (see `test/integration/README.md`); a new DSH revision requires a deliberate
+  compatibility run before updating the pin. The scenario TS has no repo-side syntax/type
+  check — it is validated only inside that checkout.
 - If you change the client entry (`lib/client.js`) or the version, re-run the harness and
   manually verify in a live `dsh web`: restart `dsh web`, then reload/reopen tabs that were
   open across the restart — already-loaded JS cannot update itself from a new server process.
