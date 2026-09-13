@@ -11,7 +11,8 @@
     "follow-up"
   ],
   "scripts": {
-    "test": "node --check lib/index.js && node --check lib/client.js && node test/web-repeat-harness.mjs"
+    "test": "node --check lib/index.js && node --check lib/client.js && node test/web-repeat-harness.mjs",
+    "test:assembled-web": "node test/run-assembled-web.mjs"
   },
   "type": "module",
   "main": "lib/index.js",

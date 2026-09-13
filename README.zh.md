@@ -62,3 +62,5 @@ npm test
 ## 许可证
 
 MIT
+
+可选的[真实 DSH Web 集成回归](test/integration/README.md)通过固定版本、已构建的 DSH 和 Chromium 加载插件，验证已有草稿、连续引用、撤销重做、会话隔离、发送序列化及 Host 驱动的不可写输入状态。

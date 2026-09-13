@@ -62,3 +62,5 @@ The regression harness covers compact native quote chips, locale switching, turn
 ## License
 
 MIT
+
+An opt-in [assembled DSH Web regression](test/integration/README.md) runs the plugin through a pinned, built DSH checkout with Chromium. It covers existing drafts, repeated quoting, undo/redo, session isolation, prompt serialization, and Host-driven unavailable input.
