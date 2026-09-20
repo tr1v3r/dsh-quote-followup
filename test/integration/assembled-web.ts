@@ -47,6 +47,9 @@ describe('quote-followup in assembled DSH Web', () => {
     })
     await seedSession(scaffold, fixture('Quote Alpha'), 'quote-alpha', undefined, { createdAt: Date.now() - 10000 })
     await seedSession(scaffold, fixture('Quote Beta'), 'quote-beta', undefined, { createdAt: Date.now() - 20000 })
+    // Persist display titles through the Host so unopened rows have stable names.
+    await scaffold.ctx.sessionController.rename({ sessionId: SessionId('quote-alpha'), title: 'Quote Alpha' })
+    await scaffold.ctx.sessionController.rename({ sessionId: SessionId('quote-beta'), title: 'Quote Beta' })
     browser = await chromium.launch()
   })
   afterAll(async () => {
@@ -59,13 +62,13 @@ describe('quote-followup in assembled DSH Web', () => {
     await page.waitForSelector('[class*="frame"]')
     await page.locator('[role="treeitem"]').first().click()
     await expect.poll(() => page.locator('[role="treeitem"]').count()).toBe(3)
-    await page.locator('[role="treeitem"]').nth(1).click()
+    await page.getByRole('treeitem').filter({ hasText: 'Quote Alpha' }).click()
     await page.getByRole('button', { name: 'Quote Alpha', exact: true }).waitFor()
     await page.getByText(EXCERPT, { exact: true }).waitFor()
   })
   afterEach(async () => { await page?.close() })
 
-  const input = () => page.locator('[data-composer-input]')
+  const input = () => page.locator('[data-composer-input]').first()
   async function quote(text: string): Promise<void> {
     await page.getByText(text, { exact: true }).evaluate(element => {
       const range = document.createRange()
@@ -83,13 +86,17 @@ describe('quote-followup in assembled DSH Web', () => {
     await quote(EXCERPT)
     await expect.poll(() => input().textContent()).toContain('Keep my question.')
     await expect.poll(() => input().locator('[title]').count()).toBe(1)
+    // The pinned composer merges history updates within 1000 ms.
+    await page.waitForTimeout(1100)
     await quote(OTHER)
     await expect.poll(() => input().locator('[title]').count()).toBe(2)
     expect(await input().textContent()).toContain(EXCERPT)
     expect(await input().textContent()).toContain(OTHER)
     const beforeUndo = await input().textContent()
     await input().press('ControlOrMeta+z')
-    await expect.poll(() => input().textContent()).not.toBe(beforeUndo)
+    await expect.poll(() => input().locator('[title]').count()).toBe(1)
+    expect(await input().textContent()).toContain(EXCERPT)
+    expect(await input().textContent()).not.toContain(OTHER)
     await input().press('ControlOrMeta+Shift+z')
     await expect.poll(() => input().textContent()).toBe(beforeUndo)
   })
@@ -97,7 +104,7 @@ describe('quote-followup in assembled DSH Web', () => {
   it('keeps quoted drafts scoped to their session', async () => {
     await input().fill('Alpha draft. ')
     await quote(EXCERPT)
-    await page.locator('[role="treeitem"][aria-selected="false"]').click()
+    await page.getByRole('treeitem').filter({ hasText: 'Quote Beta' }).click()
     await expect.poll(() => input().textContent()).toBe('')
     await input().fill('Beta draft. ')
     await quote(OTHER)

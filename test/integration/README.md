@@ -13,11 +13,11 @@ npm test
 npm run test:assembled-web -- --dsh-root <built-dsh-checkout>
 ```
 
-The runner checks the baseline revision, creates a uniquely named scenario beneath DSH's Web test discovery directory, runs its existing Vitest Web configuration, and removes the generated scenario after the child process closes. The plugin is mounted from this checkout's Host entry and package metadata. DSH loads the published client entry through its browser module graph.
+The runner checks the baseline revision, creates a uniquely named scenario beneath DSH's Web test discovery directory, inherits its Vitest Web configuration with an include restricted to that invocation, and removes the generated scenario after the child process closes. The generated scenario uses a plain TypeScript filename, so a SIGKILL residue stays outside the standard Web discovery patterns and each later invocation selects only its own scenario. Normal exits remove the generated directory. The plugin is mounted from this checkout's Host entry and package metadata. DSH loads the published client entry through its browser module graph.
 
 ## Assertions
 
-- Existing text survives two native quote insertions; undo changes the document and redo restores the complete quoted draft. Undo grouping follows the editor's native history policy.
+- Existing text survives two native quote insertions; after the pinned 1000 ms history window, undo restores exactly the first chip and redo restores the complete quoted draft.
 - A second session receives its own draft; returning to the first session restores the correct text and quoted content.
 - The real client prompt request contains the question and expanded Markdown quote for the selected session. The test intercepts and aborts that request at the browser boundary, keeping model traffic call-free.
 - A Host-driven unavailable model route makes the real composer non-editable; attempting to quote leaves the draft unchanged. The test restores the previous Host setting in a finally block.
