@@ -57,12 +57,13 @@ any tabs that stayed open across the restart.
 
 `lib/client.js` is a single self-contained browser module loaded through
 `window.__ModuleLoader__.load({ id, factory })`. It is **pure DOM** (no React, no Lexical,
-no framework import); its injected dependencies are DSH's `inputTriggers` and `locale`
-services, both optional.
+no framework import); its injected dependencies are DSH's `inputTriggers`, `locale`
+and `sessions` services. The first two remain optional; `sessions` is needed for native
+scoped insertion.
 
 It exports:
 
-- `inject: ["inputTriggers", "locale"]` — tells the DSH web client runtime which host
+- `inject: ["inputTriggers", "locale", "sessions"]` — tells the DSH web client runtime which host
   services this module needs. The `package.json` `dsh.client.inject` enables the
   `@deepseek-ai/dsh-client-ui-input-trigger` bundle so `ctx.get("inputTriggers")` exists;
   `locale` supplies the floating-action and serialized-frame copy and is optional (the
@@ -74,7 +75,7 @@ It exports:
 | Constant | Meaning |
 | --- | --- |
 | `TRANSCRIPT_SELECTOR` | `[data-slot="conversation.session"]`, owns the chat transcript (composer excluded). |
-| `COMPOSER_SELECTORS` | Ordered composer candidates — official slot first, then legacy hints. |
+| `COMPOSER_SELECTORS` | Ordered composer candidates — explicit `[data-composer-input]`, official slot, then legacy hints. |
 | `BUTTON_ID` / `BUTTON_VERSION_ATTR` | Shared DOM id + version attr for the floating button. |
 | `CLIENT_VERSION` | Must equal `package.json` `version`. |
 | `QUOTE_SOURCE` | `"quote-followup"` — codec owner for quote chips. |
@@ -110,13 +111,18 @@ It exports:
 
 ### 4.1 Native chip path
 
-`appendQuoteChip()` uses the **live Lexical editor** already attached to the composer
-(`element.__lexicalEditor`). It reads the registered node classes from `editor._nodes`
-(`reference-chip`, `text`, `paragraph`) and runs a single `editor.update(...)` that appends
-a `ReferenceChipNode` after the current draft, ensuring a separating space when the draft
-doesn't end in whitespace. It places the caret after the chip so the user can type the
-question. This reuses the exact same atomic editor entity and UI treatment as `@file` /
-`@session` with no second framework.
+`appendQuoteChip()` obtains `sessions` through the injected `ctx.get("sessions")`,
+resolves the active scope, then uses `scope.get("conversation").input.for(scope)` to
+insert the native `ReferenceChipNode`. The input
+facade owns Lexical transactions, editor mapping and phase/revision admission; this
+plugin no longer reads `_nodes`, `_nodeMap` or `_pendingEditorState`. Its published
+draft uses clipboard offsets, while `insertReference()` accepts detect-text offsets
+(where each chip occupies one character). The plugin computes the append position
+from published reference-occurrence lengths, inserts a separating space if needed,
+then inserts the chip with the updated `draftRev`. A rejected scoped edit is **not**
+retried via the unguarded text fallback. Older hosts without this service retain the
+text fallback. The same atomic editor entity and UI treatment as `@file` / `@session`
+are preserved without a second framework.
 
 The plugin also registers a **codec-only source** with `inputTriggers.registerSource(...)`:
 
@@ -138,7 +144,7 @@ projection (`""`) instead of throwing, so the send path never crashes on a bad c
 
 ### 4.2 Text fallback path
 
-If the native codec is unavailable, `appendToComposer()` appends the text blockquote
+If the session-scoped input facade or native codec is unavailable, `appendToComposer()` appends the text blockquote
 (`quoteFrame(payload)`):
 
 - **`<textarea>` / `<input>`** → use the native value setter, dispatch an `input` event,
@@ -184,12 +190,15 @@ restart in already-open tabs.
 `inputTriggers`. It dynamically imports `lib/client.js` (busting the module cache with a
 query string) and asserts:
 
-- `clientModule.inject === ["inputTriggers"]` and `apply` is a function.
+- `clientModule.inject === ["inputTriggers", "locale", "sessions"]` and `apply` is a function.
 - Source is registered as `"quote-followup"`.
 - Repeated quoting produces native `ReferenceChipNode` instances with the right source/
   label and correct Markdown in the draft.
 - Codec `serialize` matches the chip `clipboardText`.
-- Existing draft gets a separating space before the chip.
+- Existing draft gets a separating space before the chip, including repeated chips whose
+  clipboard projection is longer than the detect-text offset.
+- Rejected scoped edits do not bypass admission with a text paste; missing scoped service
+  falls back to text.
 - Firefox fallback (`native` and `synthetic clipboard` disabled) still appends text quotes.
 - A stale shared-id button is replaced by the current client's button.
 

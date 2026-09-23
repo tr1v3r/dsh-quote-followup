@@ -96,6 +96,10 @@ const userRoleNode = { nodeType: 3, parentElement: userRow };
 const composer = new FakeElement("div");
 composer.setAttribute("contenteditable", "true");
 let editorDraft = "";
+let draftRevision = 0;
+let inputPhase = "plain";
+let sessionId = "alpha";
+let nativeInsertAllowed = true;
 let focusSawClearedTranscript = false;
 let rawFallbackEnabled = true;
 
@@ -108,21 +112,57 @@ class FakeReferenceChipNode {
   constructor(insert) { this.insert = insert; }
   getTextContent() { return this.insert.clipboardText; }
 }
+const fakeInput = {
+  state: {
+    getSnapshot() {
+      const paragraph = root.getLastChild();
+      let offset = 0;
+      const occurrences = [];
+      for (const node of paragraph?.children ?? []) {
+        if (node instanceof FakeReferenceChipNode) {
+          occurrences.push({ offset, length: node.getTextContent().length });
+        }
+        offset += node.getTextContent().length;
+      }
+      return { draft: editorDraft, draftRev: draftRevision, phase: inputPhase, occurrences };
+    }
+  },
+  insertText(text, span) {
+    if (span.draftRev !== draftRevision || span.start !== this.detectEnd()) return false;
+    root.getLastChild().append(new FakeTextNode(text));
+    return true;
+  },
+  insertReference(insert, span) {
+    if (!nativeInsertAllowed || inputPhase !== "plain" || span.draftRev !== draftRevision || span.start !== this.detectEnd()) return false;
+    let paragraph = root.getLastChild();
+    if (paragraph === null) {
+      paragraph = new FakeParagraphNode();
+      root.append(paragraph);
+    }
+    paragraph.append(new FakeReferenceChipNode(insert), new FakeTextNode(" "));
+    return true;
+  },
+  detectEnd() {
+    const state = this.state.getSnapshot();
+    return state.draft.length - state.occurrences.reduce((n, row) => n + row.length - 1, 0);
+  }
+};
 class FakeParagraphNode {
   children = [];
   append(...nodes) {
     this.children.push(...nodes);
     composer.lastElementChild ??= new FakeElement("p", composer);
     editorDraft = root.getTextContent();
+    draftRevision += 1;
   }
   getTextContent() { return this.children.map((node) => node.getTextContent()).join(""); }
 }
 class FakeRootNode {
   children = [];
-  append(...nodes) { this.children.push(...nodes); editorDraft = this.getTextContent(); }
+  append(...nodes) { this.children.push(...nodes); editorDraft = this.getTextContent(); draftRevision += 1; }
   getLastChild() { return this.children.at(-1) ?? null; }
   getTextContent() { return this.children.map((node) => node.getTextContent()).join("\n"); }
-  clear() { this.children = []; editorDraft = ""; }
+  clear() { this.children = []; editorDraft = ""; draftRevision += 1; }
 }
 const root = new FakeRootNode();
 
@@ -186,7 +226,7 @@ const document = Object.assign(documentTarget, {
   createRange: makeComposerRange,
   getElementById: (id) => elementsById.get(id) ?? null,
   getSelection: () => selection,
-  querySelector: (selector) => selector.includes("contenteditable") ? composer : null
+  querySelector: (selector) => selector === '[data-composer-input]' ? composer : null
 });
 
 let clientModule;
@@ -238,7 +278,7 @@ composer.__lexicalEditor = {
 
 await import(`../lib/client.js?repeat-test=${Date.now()}`);
 assert.equal(typeof clientModule?.apply, "function");
-assert.deepEqual(clientModule.inject, ["inputTriggers", "locale"]);
+assert.deepEqual(clientModule.inject, ["inputTriggers", "locale", "sessions"]);
 
 let quoteSource = null;
 const inputTriggers = {
@@ -276,6 +316,15 @@ clientModule.apply({
   get(name) {
     if (name === "inputTriggers") return inputTriggers;
     if (name === "locale") return locale;
+    if (name === "sessions") return {
+      list: { getSnapshot: () => ({ current: sessionId }) },
+      scope: (id) => id === sessionId ? {
+        sessionId: id,
+        get: (service) => service === "conversation" ? {
+          input: { for: (scope) => scope.sessionId === sessionId ? fakeInput : undefined }
+        } : undefined
+      } : undefined
+    };
     throw new Error("unexpected " + name);
   },
   effect(setup) { return setup(); }
@@ -379,11 +428,35 @@ assert.equal(await quoteSource.codec.serialize("not json"), "");
 assert.equal(quoteSource.codec.clipboardText("not json"), "");
 assert.equal(await quoteSource.codec.serialize(JSON.stringify({ text: 42 })), "");
 
-// Firefox fallback: no native chip node AND no Lexical paste command, so the
-// quote must survive the synthetic ClipboardEvent path (DataTransfer re-attach).
+// The facade's published clipboard offsets differ from chip-aware detect offsets.
+root.clear();
+composer.lastElementChild = null;
+const longParagraph = new FakeParagraphNode();
+root.append(longParagraph);
+longParagraph.append(new FakeTextNode("prefix"));
+quote("long clipboard expansion");
+quote("append after an existing chip");
+assert.equal(longParagraph.children.filter(node => node instanceof FakeReferenceChipNode).length, 2);
+assert.match(root.getTextContent(), /prefix > \[Quote · conversation\]/);
+
+// A supported facade refusing an edit must not be bypassed by text paste.
+root.clear();
+composer.lastElementChild = null;
+inputPhase = "adjudicating";
+quote("rejected while busy");
+assert.equal(root.getTextContent(), "", "busy phase cannot be bypassed by text fallback");
+inputPhase = "plain";
+nativeInsertAllowed = false;
+quote("rejected reference");
+assert.equal(root.getTextContent(), "", "failed scoped insert cannot be bypassed by text fallback");
+nativeInsertAllowed = true;
+
+// Firefox fallback: without a scoped input service or Lexical paste command,
+// the quote survives the synthetic ClipboardEvent path (DataTransfer re-attach).
 root.clear();
 composer.lastElementChild = null;
 editorDraft = "";
+sessionId = undefined;
 nativeChipEnabled = false;
 lexicalPasteEnabled = false;
 syntheticClipboardEnabled = false;
