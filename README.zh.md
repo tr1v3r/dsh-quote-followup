@@ -21,9 +21,10 @@
 - chip 使用与 `@文件` / `@对话` 相同的 `ReferenceChipNode`、对话图标和业务色，可整体删除。
 - chip 只展示摘录正文，引用语义由气泡图标表达，减少重复标签。
 - 浮动按钮和发送时的引用框架跟随 DSH 当前语言。
-- 选中内容来自 DSH 聊天行时，序列化引用会附带对话轮次编号，模型可定位"第 3 轮引用的内容"；无轮次标记时保持原有框架。
+- 选区两端属于同一 DSH 聊天行时，序列化引用附带对话轮次编号；跨消息选区保留摘录，但不标注归属不明的角色与轮次。
 - 可连续引用多段内容；发送时由插件 codec 将各 chip 展开为模型可读的 Markdown 引用块。
 - 旧版 DSH 缺少原生 chip 能力时，自动降级为纯文本引用。
+- 输入框缺失或暂不可编辑时显示本地化提示，恢复原选区，便于重试引用。
 
 本插件不再适配 TUI。
 
@@ -57,7 +58,7 @@ dsh plugin --profile web add dsh-quote-followup
 npm test
 ```
 
-回归测试覆盖精简的原生引用 chip、中英文 locale 切换、轮次溯源与降级、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
+回归测试覆盖精简的原生引用 chip、中英文 locale 切换、同消息与跨消息的来源判定、输入框缺失/不可编辑时的提示与重试、连续引用、已有草稿后的间距、codec 序列化、Firefox 文本降级路径，以及热替换后新版 client 接管旧按钮/单例状态。
 
 可选的[真实 DSH Web 集成回归](https://github.com/tr1v3r/dsh-quote-followup/blob/master/test/integration/README.md)通过固定版本、已构建的 DSH 和 Chromium 加载插件，验证已有草稿、连续引用、撤销重做、会话隔离、发送序列化及 Host 驱动的不可写输入状态。
 

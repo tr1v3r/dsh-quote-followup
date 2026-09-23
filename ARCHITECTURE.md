@@ -92,8 +92,8 @@ It exports:
  selectionInTranscript()  ── both anchor & focus in same transcript?
         │  yes, non-collapsed, non-blank text
         ▼
- detectRole()            ── best-effort "user"/"assistant" from data-* / class hints
- detectTurn()            ── per-session turn ordinal from data-chat-turn (nullable)
+ messageRowOf()           ── same data-chat-turn row at both range endpoints?
+ detectRole() / detectTurn() ── only attribute role/turn for a single marked row
  pendingQuote = { text, role, turn }
         │
         ▼
@@ -161,6 +161,10 @@ If the session-scoped input facade or native codec is unavailable, `appendToComp
 security differences around synthetic `clipboardData` while still entering the editor's
 model. DOM-level text insertion into a Lexical root does **not** update the editor model.
 
+Before insertion, a missing or non-editable composer produces a localized status notice,
+restores the original range and retains the pending excerpt for retry. Escape, scroll,
+clicking elsewhere, or a changed selection dismisses the pending excerpt.
+
 ## 5. Firefox considerations
 
 A constructed `ClipboardEvent` may drop its `clipboardData` argument in Firefox. The code
@@ -195,6 +199,8 @@ query string) and asserts:
 - Repeated quoting produces native `ReferenceChipNode` instances with the right source/
   label and correct Markdown in the draft.
 - Codec `serialize` matches the chip `clipboardText`.
+- Cross-message selections keep their text but omit ambiguous role/turn provenance.
+- Missing or locked composers show localized feedback and allow retry while the selection remains active.
 - Existing draft gets a separating space before the chip, including repeated chips whose
   clipboard projection is longer than the detect-text offset.
 - Rejected scoped edits do not bypass admission with a text paste; missing scoped service
