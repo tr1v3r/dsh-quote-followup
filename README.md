@@ -17,7 +17,7 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 ## Features
 
 - Select text inside the Web conversation transcript to reveal a floating **Quote** button.
-- Append a native DSH conversation-reference chip without replacing the existing draft.
+- Append a native DSH conversation-reference chip without replacing the existing draft, using the session-scoped composer input facade rather than Lexical's private node registry.
 - Reuse the same atomic `ReferenceChipNode`, conversation icon, and business color as `@file` / `@session`.
 - Keep each chip compact by showing only the excerpt; the bubble icon already conveys that it is a quote.
 - Follow the active DSH locale for the floating action and serialized quote frame.
