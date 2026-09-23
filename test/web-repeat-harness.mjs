@@ -56,6 +56,7 @@ class FakeElement extends FakeTarget {
     this.textContent = "";
   }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
+  hasAttribute(name) { return this.attributes.has(name); }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
   closest(selector) {
     let cursor = this;
@@ -68,6 +69,7 @@ class FakeElement extends FakeTarget {
   }
   focus() {}
   remove() { elementsById.delete(this.id); }
+  click() { this.dispatchEvent(new FakeEvent("click", { cancelable: true })); }
 }
 
 class FakeDataTransfer {
@@ -86,12 +88,16 @@ const startNode = { nodeType: 3, parentElement: transcript };
 const turnRow = new FakeElement("article", transcript);
 turnRow.setAttribute("data-chat-turn", "3");
 const turnStartNode = { nodeType: 3, parentElement: turnRow };
+const otherTurnRow = new FakeElement("article", transcript);
+otherTurnRow.setAttribute("data-chat-turn", "4");
+const otherTurnNode = { nodeType: 3, parentElement: otherTurnRow };
 // Invalid marker values must degrade to "no provenance" instead of NaN.
 const badTurnRow = new FakeElement("article", transcript);
 badTurnRow.setAttribute("data-chat-turn", "not-a-number");
 // A message row carrying a role marker, for localized serialized headers.
 const userRow = new FakeElement("article", transcript);
 userRow.setAttribute("data-role", "user");
+userRow.setAttribute("data-chat-turn", "5");
 const userRoleNode = { nodeType: 3, parentElement: userRow };
 const composer = new FakeElement("div");
 composer.setAttribute("contenteditable", "true");
@@ -156,8 +162,10 @@ composer.addEventListener("paste", (event) => {
   composer.lastElementChild ??= new FakeElement("p", composer);
 });
 
-const makeTranscriptRange = (selectedNode = startNode) => ({
+const makeTranscriptRange = (selectedNode = startNode, endNode = selectedNode) => ({
   startContainer: selectedNode,
+  endContainer: endNode,
+  cloneRange() { return this; },
   getBoundingClientRect: () => ({ left: 100, top: 100, bottom: 120, width: 80, height: 20 })
 });
 const makeComposerRange = () => ({
@@ -169,6 +177,7 @@ const makeComposerRange = () => ({
   }
 });
 
+let composerAvailable = true;
 const documentTarget = new FakeTarget();
 const document = Object.assign(documentTarget, {
   head: {
@@ -186,7 +195,7 @@ const document = Object.assign(documentTarget, {
   createRange: makeComposerRange,
   getElementById: (id) => elementsById.get(id) ?? null,
   getSelection: () => selection,
-  querySelector: (selector) => selector.includes("contenteditable") ? composer : null
+  querySelector: (selector) => composerAvailable && selector.includes("contenteditable") ? composer : null
 });
 
 let clientModule;
@@ -293,13 +302,13 @@ assert.equal(
   "style version tracks the button version"
 );
 
-const quote = (text, selectedNode = startNode) => {
+const quote = (text, selectedNode = startNode, endNode = selectedNode) => {
   selection.isCollapsed = false;
   selection.rangeCount = 1;
   selection.anchorNode = selectedNode;
-  selection.focusNode = selectedNode;
+  selection.focusNode = endNode;
   selection.text = text;
-  selection.range = makeTranscriptRange(selectedNode);
+  selection.range = makeTranscriptRange(selectedNode, endNode);
   document.dispatchEvent(new FakeEvent("selectionchange"));
   const button = document.getElementById("dsh-quote-followup-btn");
   assert.ok(button, "quote button mounted");
@@ -351,6 +360,15 @@ assert.deepEqual(JSON.parse(turnChip.insert.ref), {
   turn: 3
 });
 assert.equal(await quoteSource.codec.serialize(turnChip.insert.ref), "> [Quote · conversation · turn 3]\n> turn three excerpt\n\n");
+// Crossing two message rows must not claim the start row's turn or role.
+root.clear();
+composer.lastElementChild = null;
+quote("two messages", userRoleNode, otherTurnNode);
+const crossChip = root.getLastChild().children.find((node) => node instanceof FakeReferenceChipNode);
+assert.deepEqual(JSON.parse(crossChip.insert.ref), {
+  text: "two messages", role: null, truncated: false, turn: null
+});
+assert.equal(await quoteSource.codec.serialize(crossChip.insert.ref), "> [Quote · conversation]\n> two messages\n\n");
 activeLocale = "zh";
 assert.equal(await quoteSource.codec.serialize(turnChip.insert.ref), "> [引用 · 对话 · 第 3 轮]\n> turn three excerpt\n\n");
 activeLocale = "en";
@@ -369,15 +387,62 @@ composer.lastElementChild = null;
 quote("user role excerpt", userRoleNode);
 const roleChip = root.getLastChild().children.find((node) => node instanceof FakeReferenceChipNode);
 assert.equal(roleChip.insert.label, "user role excerpt");
-assert.equal(await quoteSource.codec.serialize(roleChip.insert.ref), "> [Quote · user]\n> user role excerpt\n\n");
+assert.equal(await quoteSource.codec.serialize(roleChip.insert.ref), "> [Quote · user · turn 5]\n> user role excerpt\n\n");
 activeLocale = "zh";
-assert.equal(await quoteSource.codec.serialize(roleChip.insert.ref), "> [引用 · 用户]\n> user role excerpt\n\n");
+assert.equal(await quoteSource.codec.serialize(roleChip.insert.ref), "> [引用 · 用户 · 第 5 轮]\n> user role excerpt\n\n");
 activeLocale = "en";
 
 // Malformed chip refs degrade to an empty projection instead of throwing.
 assert.equal(await quoteSource.codec.serialize("not json"), "");
 assert.equal(quoteSource.codec.clipboardText("not json"), "");
 assert.equal(await quoteSource.codec.serialize(JSON.stringify({ text: 42 })), "");
+
+// Missing/locked composers show localized feedback and retain the excerpt for retry.
+const button = document.getElementById("dsh-quote-followup-btn");
+const selectOnly = (text) => {
+  selection.isCollapsed = false;
+  selection.rangeCount = 1;
+  selection.anchorNode = turnStartNode;
+  selection.focusNode = turnStartNode;
+  selection.text = text;
+  selection.range = makeTranscriptRange(turnStartNode);
+  document.dispatchEvent(new FakeEvent("selectionchange"));
+};
+root.clear();
+composer.lastElementChild = null;
+selectOnly("retry after missing composer");
+composerAvailable = false;
+button.click();
+assert.match(document.getElementById("dsh-quote-followup-notice").textContent, /Composer not found/);
+assert.equal(selection.rangeCount, 1, "failed insert restores the original selection");
+assert.equal(root.getTextContent(), "");
+composerAvailable = true;
+button.click();
+assert.match(root.getTextContent(), /retry after missing composer/);
+assert.equal(document.getElementById("dsh-quote-followup-notice"), null);
+root.clear();
+composer.lastElementChild = null;
+selectOnly("retry after locked composer");
+composer.setAttribute("contenteditable", "false");
+button.click();
+assert.match(document.getElementById("dsh-quote-followup-notice").textContent, /unavailable/);
+assert.equal(selection.rangeCount, 1, "locked composer preserves the selection");
+assert.equal(root.getTextContent(), "");
+activeLocale = "zh";
+localeSubscriber();
+assert.match(document.getElementById("dsh-quote-followup-notice").textContent, /输入框暂不可编辑/);
+activeLocale = "en";
+composer.setAttribute("contenteditable", "true");
+button.click();
+assert.match(root.getTextContent(), /retry after locked composer/);
+
+// Dismissed selections cannot insert a stale quote after Escape.
+root.clear();
+composer.lastElementChild = null;
+selectOnly("discarded selection");
+document.dispatchEvent(new FakeEvent("keydown", { key: "Escape" }));
+button.click();
+assert.equal(root.getTextContent(), "");
 
 // Firefox fallback: no native chip node AND no Lexical paste command, so the
 // quote must survive the synthetic ClipboardEvent path (DataTransfer re-attach).

@@ -21,9 +21,10 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 - Reuse the same atomic `ReferenceChipNode`, conversation icon, and business color as `@file` / `@session`.
 - Keep each chip compact by showing only the excerpt; the bubble icon already conveys that it is a quote.
 - Follow the active DSH locale for the floating action and serialized quote frame.
-- Attach the conversation turn number to the serialized frame when the selection comes from a DSH chat row, so follow-ups like "revisit turn 3" stay resolvable. Selections without a turn marker keep the provenance-free frame.
+- Attach the conversation turn number to the serialized frame when both ends of the selection belong to the same DSH chat row. Selections spanning messages keep the excerpt but omit ambiguous role/turn provenance.
 - Quote multiple excerpts; on send, the plugin codec expands each chip into a model-readable Markdown blockquote.
 - Fall back to a plain-text quote when the host lacks native chip support.
+- Show a localized notice if the composer is missing or unavailable, restore the selection, and let you retry quoting the original text.
 
 TUI is intentionally unsupported.
 
@@ -57,7 +58,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 npm test
 ```
 
-The regression harness covers compact native quote chips, locale switching, turn-number provenance with graceful degradation, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
+The regression harness covers compact native quote chips, locale switching, single-row versus cross-message provenance, missing/locked composer feedback and retry, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
 
 An opt-in [assembled DSH Web regression](https://github.com/tr1v3r/dsh-quote-followup/blob/master/test/integration/README.md) runs the plugin through a pinned, built DSH checkout with Chromium. It covers existing drafts, repeated quoting, undo/redo, session isolation, prompt serialization, and Host-driven unavailable input.
 
