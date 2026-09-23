@@ -171,6 +171,11 @@ const makeComposerRange = () => ({
 
 const documentTarget = new FakeTarget();
 const document = Object.assign(documentTarget, {
+  head: {
+    appendChild(element) {
+      if (element.id !== "") elementsById.set(element.id, element);
+    }
+  },
   body: {
     appendChild(element) {
       if (element.id !== "") elementsById.set(element.id, element);
@@ -278,6 +283,15 @@ clientModule.apply({
 assert.equal(staleStateDisposed, true, "stale singleton state disposed on takeover");
 assert.ok(quoteSource, "quote codec source registered");
 assert.equal(document.getElementById("dsh-quote-followup-btn").textContent, "❐ Quote");
+// The versioned stylesheet is injected next to the button (theme-token pill).
+const injectedStyle = document.getElementById("dsh-quote-followup-style");
+assert.ok(injectedStyle, "quote button stylesheet injected");
+assert.match(String(injectedStyle.textContent), /dsh-qf-btn/);
+assert.equal(
+  injectedStyle.getAttribute("data-dsh-quote-followup-style-version"),
+  document.getElementById("dsh-quote-followup-btn").getAttribute("data-dsh-quote-followup-version"),
+  "style version tracks the button version"
+);
 
 const quote = (text, selectedNode = startNode) => {
   selection.isCollapsed = false;
@@ -290,7 +304,7 @@ const quote = (text, selectedNode = startNode) => {
   const button = document.getElementById("dsh-quote-followup-btn");
   assert.ok(button, "quote button mounted");
   assert.notEqual(button, staleButton, "current client replaces a stale shared-id button");
-  assert.equal(button.style.display, "block");
+  assert.equal(button.style.display, "inline-flex");
   button.dispatchEvent(new FakeEvent("mousedown", { cancelable: true }));
   button.dispatchEvent(new FakeEvent("click", { cancelable: true }));
   assert.equal(focusSawClearedTranscript, true, "transcript selection cleared before composer focus");
