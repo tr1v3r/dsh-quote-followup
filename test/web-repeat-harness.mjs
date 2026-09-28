@@ -105,6 +105,12 @@ let editorDraft = "";
 let draftRevision = 0;
 let inputPhase = "plain";
 let sessionId = "alpha";
+let uiSessionAvailable = true;
+let bindingAvailable = true;
+let facadeAvailable = true;
+let legacyScopeOnly = false;
+let sessionsGetThrows = false;
+let codecAvailable = true;
 let nativeInsertAllowed = true;
 let focusSawClearedTranscript = false;
 let rawFallbackEnabled = true;
@@ -287,7 +293,7 @@ composer.__lexicalEditor = {
 
 await import(`../lib/client.js?repeat-test=${Date.now()}`);
 assert.equal(typeof clientModule?.apply, "function");
-assert.deepEqual(clientModule.inject, ["inputTriggers", "locale", "sessions"]);
+assert.deepEqual(clientModule.inject, ["inputTriggers", "locale", "sessions", "uiSession"]);
 
 let quoteSource = null;
 const inputTriggers = {
@@ -321,23 +327,33 @@ globalThis[Symbol.for("dsh-quote-followup.state")] = {
   version: "0.0.0",
   dispose() { staleStateDisposed = true; }
 };
-clientModule.apply({
+const makeScope = (id) => id === sessionId ? {
+  sessionId: id,
+  get: (service) => service === "conversation" ? {
+    input: facadeAvailable ? { for: (scope) => scope.sessionId === sessionId ? fakeInput : undefined } : undefined
+  } : undefined
+} : undefined;
+const clientContext = {
   get(name) {
-    if (name === "inputTriggers") return inputTriggers;
+    if (name === "inputTriggers") return codecAvailable ? inputTriggers : undefined;
     if (name === "locale") return locale;
-    if (name === "sessions") return {
-      list: { getSnapshot: () => ({ current: sessionId }) },
-      scope: (id) => id === sessionId ? {
-        sessionId: id,
-        get: (service) => service === "conversation" ? {
-          input: { for: (scope) => scope.sessionId === sessionId ? fakeInput : undefined }
-        } : undefined
-      } : undefined
-    };
+    if (name === "uiSession") return uiSessionAvailable ? {
+      adapter: { current: { getSnapshot: () => ({ key: sessionId }) } }
+    } : undefined;
+    if (name === "sessions") {
+      if (sessionsGetThrows) throw new Error("sessions temporarily unavailable");
+      return {
+        // The modern list has no current; the legacy snapshot does.
+        list: { getSnapshot: () => uiSessionAvailable ? {} : { current: sessionId } },
+        binding: legacyScopeOnly ? undefined : (id) => bindingAvailable ? { sessionId: id, ctx: makeScope(id) } : undefined,
+        scope: makeScope
+      };
+    }
     throw new Error("unexpected " + name);
   },
   effect(setup) { return setup(); }
-});
+};
+clientModule.apply(clientContext);
 assert.equal(staleStateDisposed, true, "stale singleton state disposed on takeover");
 assert.ok(quoteSource, "quote codec source registered");
 assert.equal(document.getElementById("dsh-quote-followup-btn").textContent, "❐ Quote");
@@ -350,6 +366,11 @@ assert.equal(
   document.getElementById("dsh-quote-followup-btn").getAttribute("data-dsh-quote-followup-version"),
   "style version tracks the button version"
 );
+
+const remountClient = () => {
+  globalThis[Symbol.for("dsh-quote-followup.state")]?.dispose();
+  clientModule.apply(clientContext);
+};
 
 const quote = (text, selectedNode = startNode, endNode = selectedNode) => {
   selection.isCollapsed = false;
@@ -368,7 +389,8 @@ const quote = (text, selectedNode = startNode, endNode = selectedNode) => {
   assert.equal(focusSawClearedTranscript, true, "transcript selection cleared before composer focus");
 };
 
-// Native path: repeated selections become DSH ReferenceChipNode instances.
+// Modern 0.1.7 selection is the UI adapter key, not sessions.list.current.
+// Repeated selections become native DSH ReferenceChipNode instances.
 quote("first fragment");
 quote("second fragment");
 const paragraph = root.getLastChild();
@@ -385,6 +407,70 @@ assert.match(await quoteSource.codec.serialize(chips[0].insert.ref), /^> \[Quote
 activeLocale = "zh";
 assert.match(await quoteSource.codec.serialize(chips[0].insert.ref), /^> \[引用 · 对话\]/);
 activeLocale = "en";
+
+// Legacy hosts still resolve list.current when the UI adapter is absent.
+root.clear();
+composer.lastElementChild = null;
+uiSessionAvailable = false;
+legacyScopeOnly = true;
+quote("legacy selected fragment");
+assert.ok(root.getLastChild().children.some((node) => node instanceof FakeReferenceChipNode), "legacy selection keeps native insertion");
+assert.match(editorDraft, /> legacy selected fragment/);
+legacyScopeOnly = false;
+uiSessionAvailable = true;
+
+// An absent modern selection or released binding must not paste unscoped text.
+root.clear();
+composer.lastElementChild = null;
+sessionId = undefined;
+quote("no selected session");
+assert.equal(editorDraft, "", "absent selection cannot fall back to raw text");
+assert.match(document.getElementById("dsh-quote-followup-notice").textContent, /could not be inserted/);
+sessionId = "alpha";
+bindingAvailable = false;
+quote("binding not retained");
+assert.equal(editorDraft, "", "released binding cannot fall back to raw text or legacy scope");
+bindingAvailable = true;
+
+// A missing codec must obey the same selection/binding guard as the native path.
+codecAvailable = false;
+remountClient();
+assert.equal(quoteSource, null, "codec is genuinely unavailable after remount");
+root.clear();
+composer.lastElementChild = null;
+sessionId = undefined;
+quote("no session without codec");
+assert.equal(editorDraft, "", "missing codec cannot bypass absent selection");
+assert.match(document.getElementById("dsh-quote-followup-notice").textContent, /could not be inserted/);
+sessionId = "alpha";
+bindingAvailable = false;
+quote("released binding without codec");
+assert.equal(editorDraft, "", "missing codec cannot bypass released binding");
+bindingAvailable = true;
+sessionsGetThrows = true;
+const originalWarn = console.warn;
+let unavailableWarning = null;
+console.warn = (...args) => { unavailableWarning = args; };
+try {
+  quote("sessions service throws without codec");
+} finally {
+  console.warn = originalWarn;
+}
+assert.match(unavailableWarning?.[1]?.message ?? "", /sessions temporarily unavailable/);
+assert.equal(editorDraft, "", "sessions retrieval failure cannot paste unscoped text");
+sessionsGetThrows = false;
+// Old host with a selected scope and no codec should still use plain text.
+uiSessionAvailable = false;
+legacyScopeOnly = true;
+quote("legacy text without codec");
+assert.match(editorDraft, /> legacy text without codec/);
+root.clear();
+composer.lastElementChild = null;
+legacyScopeOnly = false;
+uiSessionAvailable = true;
+codecAvailable = true;
+remountClient();
+assert.ok(quoteSource, "codec is registered again after remount");
 
 // Existing draft receives a separating space before the native chip.
 root.clear();
@@ -521,8 +607,11 @@ assert.equal(root.getTextContent(), "");
 root.clear();
 composer.lastElementChild = null;
 editorDraft = "";
-sessionId = undefined;
+uiSessionAvailable = false;
+sessionId = "alpha";
 nativeChipEnabled = false;
+// A truly missing input facade, unlike a missing selected binding, permits text fallback.
+facadeAvailable = false;
 lexicalPasteEnabled = false;
 syntheticClipboardEnabled = false;
 rawFallbackEnabled = false;

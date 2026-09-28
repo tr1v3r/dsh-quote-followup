@@ -57,17 +57,18 @@ any tabs that stayed open across the restart.
 
 `lib/client.js` is a single self-contained browser module loaded through
 `window.__ModuleLoader__.load({ id, factory })`. It is **pure DOM** (no React, no Lexical,
-no framework import); its injected dependencies are DSH's `inputTriggers`, `locale`
-and `sessions` services. The first two remain optional; `sessions` is needed for native
-scoped insertion.
+no framework import); its injected dependencies are DSH's `inputTriggers`, `locale`,
+`sessions`, and `uiSession` services. The first two remain optional; `sessions` provides
+scoped insertion, and `uiSession` owns the selected session in DSH 0.1.7.
 
 It exports:
 
-- `inject: ["inputTriggers", "locale", "sessions"]` — tells the DSH web client runtime which host
-  services this module needs. The `package.json` `dsh.client.inject` enables the
+- `inject: ["inputTriggers", "locale", "sessions", "uiSession"]` — tells the DSH web client runtime
+  which host services this module needs. The `package.json` `dsh.client.inject` enables the
   `@deepseek-ai/dsh-client-ui-input-trigger` bundle so `ctx.get("inputTriggers")` exists;
   `locale` supplies the floating-action and serialized-frame copy and is optional (the
-  module falls back to English when it is absent).
+  module falls back to English when it is absent). The `uiSession.adapter.current` snapshot
+  supplies the active key on DSH 0.1.7; older hosts fall back to `sessions.list.current`.
 - `apply(ctx)` — the entry point invoked by the web client runtime.
 
 ### Constants
@@ -105,22 +106,30 @@ It exports:
         ▼
  quotePayload() ── trim + cap (QUOTE_MAX_CHARS) → { text, role, truncated, turn }
         │
+        ▼
+  selectedSessionScope() ── selected key and live binding available?
+        │ yes
         ├──quoteSourceReady && appendQuoteChip()──►  native ReferenceChipNode path
-        └──else──────────────────────────────────►  text-blockquote fallback path
+        └──codec/facade unavailable──────────────►  text-blockquote fallback path
+        no ──► restore selection and show notice (no unscoped paste)
 ```
 
 ### 4.1 Native chip path
 
-`appendQuoteChip()` obtains `sessions` through the injected `ctx.get("sessions")`,
-resolves the active scope, then uses `scope.get("conversation").input.for(scope)` to
-insert the native `ReferenceChipNode`. The input
+`selectedSessionScope()` obtains `sessions` through the injected `ctx.get("sessions")`,
+reads the selected key from `uiSession.adapter.current.getSnapshot()` (falling back to
+`sessions.list.getSnapshot().current` on older hosts), borrows `sessions.binding(key)` and
+uses its scoped context at `binding.ctx` (or legacy `sessions.scope(key)`) synchronously.
+Both native insertion and text fallback require this guard. `appendQuoteChip()` then uses
+`scope.get("conversation").input.for(scope)`
+to insert the native `ReferenceChipNode`. The input
 facade owns Lexical transactions, editor mapping and phase/revision admission; this
 plugin no longer reads `_nodes`, `_nodeMap` or `_pendingEditorState`. Its published
 draft uses clipboard offsets, while `insertReference()` accepts detect-text offsets
 (where each chip occupies one character). The plugin computes the append position
 from published reference-occurrence lengths, inserts a separating space if needed,
-then inserts the chip with the updated `draftRev`. A rejected scoped edit is **not**
-retried via the unguarded text fallback. Older hosts without this service retain the
+then inserts the chip with the updated `draftRev`. A rejected scoped edit, absent selection, or unavailable binding is **not**
+retried via the unguarded text fallback. Older hosts without the input facade retain the
 text fallback. The same atomic editor entity and UI treatment as `@file` / `@session`
 are preserved without a second framework.
 
@@ -144,8 +153,8 @@ projection (`""`) instead of throwing, so the send path never crashes on a bad c
 
 ### 4.2 Text fallback path
 
-If the session-scoped input facade or native codec is unavailable, `appendToComposer()` appends the text blockquote
-(`quoteFrame(payload)`):
+If the session-scoped input facade or native codec is unavailable **but a selected session
+binding exists**, `appendToComposer()` appends the text blockquote (`quoteFrame(payload)`):
 
 - **`<textarea>` / `<input>`** → use the native value setter, dispatch an `input` event,
   and place the caret at the end.
@@ -194,10 +203,12 @@ restart in already-open tabs.
 `inputTriggers`. It dynamically imports `lib/client.js` (busting the module cache with a
 query string) and asserts:
 
-- `clientModule.inject === ["inputTriggers", "locale", "sessions"]` and `apply` is a function.
+- `clientModule.inject === ["inputTriggers", "locale", "sessions", "uiSession"]` and `apply` is a function.
 - Source is registered as `"quote-followup"`.
-- Repeated quoting produces native `ReferenceChipNode` instances with the right source/
-  label and correct Markdown in the draft.
+- Modern UI-adapter selection and legacy list selection both produce native
+  `ReferenceChipNode` instances; absent selection, released binding, or failed sessions
+  retrieval never pastes unscoped text even if the codec is missing.
+- Repeated quoting produces native chips with the right source/label and Markdown draft.
 - Codec `serialize` matches the chip `clipboardText`.
 - Cross-message selections keep their text but omit ambiguous role/turn provenance.
 - Missing or locked composers show localized feedback and allow retry while the selection remains active.

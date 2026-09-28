@@ -23,6 +23,7 @@ A Web-only [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) p
 - Follow the active DSH locale for the floating action and serialized quote frame.
 - Attach the conversation turn number to the serialized frame when both ends of the selection belong to the same DSH chat row. Selections spanning messages keep the excerpt but omit ambiguous role/turn provenance.
 - Quote multiple excerpts; on send, the plugin codec expands each chip into a model-readable Markdown blockquote.
+- Resolve the active session through the DSH 0.1.7 UI session adapter, while retaining the older session-list selection path; never paste an unscoped quote when no session binding is available.
 - Fall back to a plain-text quote when the host lacks native chip support.
 - Show a localized notice if the composer is missing or unavailable, restore the selection, and let you retry quoting the original text.
 
@@ -58,7 +59,7 @@ Add `dsh-quote-followup` to the Web profile's `dsh.profile.bundles`, then restar
 npm test
 ```
 
-The regression harness covers compact native quote chips, locale switching, single-row versus cross-message provenance, missing/locked composer feedback and retry, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
+The regression harness covers modern and legacy session selection, absent selection/binding, compact native quote chips, locale switching, single-row versus cross-message provenance, missing/locked composer feedback and retry, repeated quoting, spacing after an existing draft, codec serialization, the Firefox text fallback, and current-client takeover of stale singleton/button state after a hot swap.
 
 An opt-in [assembled DSH Web regression](https://github.com/tr1v3r/dsh-quote-followup/blob/master/test/integration/README.md) runs the plugin through a pinned, built DSH checkout with Chromium. It covers existing drafts, repeated quoting, undo/redo, session isolation, prompt serialization, and Host-driven unavailable input.
 
