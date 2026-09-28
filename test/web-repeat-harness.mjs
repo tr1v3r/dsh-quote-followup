@@ -113,6 +113,8 @@ let sessionsGetThrows = false;
 let codecAvailable = true;
 let nativeInsertAllowed = true;
 let focusSawClearedTranscript = false;
+let caretOffset = null;
+let lexicalCaretOffset = null;
 let rawFallbackEnabled = true;
 
 class FakeTextNode {
@@ -152,11 +154,18 @@ const fakeInput = {
       root.append(paragraph);
     }
     paragraph.append(new FakeReferenceChipNode(insert), new FakeTextNode(" "));
+    lexicalCaretOffset = this.detectEnd();
     return true;
   },
   detectEnd() {
     const state = this.state.getSnapshot();
     return state.draft.length - state.occurrences.reduce((n, row) => n + row.length - 1, 0);
+  },
+  focus() {
+    // DSH's input facade first focuses the DOM, then restores Lexical's
+    // selection left by insertReference (after its chip and separator).
+    composer.focus();
+    caretOffset = lexicalCaretOffset;
   }
 };
 class FakeParagraphNode {
@@ -198,6 +207,8 @@ const selection = {
 
 composer.focus = () => {
   focusSawClearedTranscript = selection.rangeCount === 0;
+  // A bare DOM focus on a Lexical contenteditable lands at the start.
+  caretOffset = 0;
 };
 composer.addEventListener("paste", (event) => {
   const text = event.clipboardData?.getData("text/plain") ?? "";
@@ -392,7 +403,10 @@ const quote = (text, selectedNode = startNode, endNode = selectedNode) => {
 // Modern 0.1.7 selection is the UI adapter key, not sessions.list.current.
 // Repeated selections become native DSH ReferenceChipNode instances.
 quote("first fragment");
+assert.equal(caretOffset, fakeInput.detectEnd(), "first quote leaves caret after the chip");
 quote("second fragment");
+assert.equal(caretOffset, fakeInput.detectEnd(), "repeated quote leaves caret at the draft end");
+assert.ok(caretOffset > 0, "caret must not jump to the draft start");
 const paragraph = root.getLastChild();
 const chips = paragraph.children.filter((node) => node instanceof FakeReferenceChipNode);
 assert.equal(chips.length, 2);
