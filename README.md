@@ -38,7 +38,7 @@ Chips are text-only by design. They carry the excerpt, a display-only role hint,
 
 ## Install
 
-Requires DSH `>=0.1.2-rc.1`.
+DSH compatibility is declared in top-level `engines.dsh`: `>=0.1.2-rc.1 <0.2.2-0 || 0.2.2-rc.1`. The `0.2.2-rc.1` Web runtime is supported; later releases require separate validation.
 
 ```bash
 dsh plugin --profile web add dsh-quote-followup

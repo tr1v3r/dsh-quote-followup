@@ -19,8 +19,8 @@ TUI is intentionally unsupported.
 
 ```json
 "main": "lib/index.js",
+"engines": { "dsh": ">=0.1.2-rc.1 <0.2.2-0 || 0.2.2-rc.1" },
 "dsh": {
-  "engines": { "dsh": ">=0.1.2-rc.1" },
   "bundle": { "patch": "./cordis.patch.yml" },
   "client": {
     "inject": ["@deepseek-ai/dsh-client-ui-input-trigger"],
