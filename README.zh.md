@@ -38,7 +38,7 @@ chip 刻意只存文本：包含摘录正文、仅供显示的角色提示、可
 
 ## 安装
 
-要求 DSH `>=0.1.2-rc.1`。
+DSH 兼容范围通过顶层 `engines.dsh` 声明：`>=0.1.2-rc.1 <0.2.2-0 || 0.2.2-rc.1`。支持 `0.2.2-rc.1` Web 运行时，后续版本需单独验证。
 
 ```bash
 dsh plugin --profile web add dsh-quote-followup
